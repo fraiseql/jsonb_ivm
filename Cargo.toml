@@ -1,0 +1,39 @@
+[package]
+name = "jsonb_ivm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lionel Hamayon <lionel.hamayon@evolution-digitale.fr>"]
+license = "PostgreSQL"
+description = "Incremental JSONB View Maintenance for CQRS Architectures"
+homepage = "https://github.com/fraiseql/jsonb_ivm"
+repository = "https://github.com/fraiseql/jsonb_ivm"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "pgrx_embed_jsonb_ivm"
+path = "./src/bin/pgrx_embed.rs"
+
+[dependencies]
+pgrx = "=0.12.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+default = ["pg17"]
+pg12 = ["pgrx/pg12"]
+pg13 = ["pgrx/pg13"]
+pg14 = ["pgrx/pg14"]
+pg15 = ["pgrx/pg15"]
+pg16 = ["pgrx/pg16"]
+pg17 = ["pgrx/pg17"]
+pg_test = []
+
+[dev-dependencies]
+pgrx-tests = "0.12.8"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

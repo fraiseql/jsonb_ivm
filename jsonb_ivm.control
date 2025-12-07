@@ -1,0 +1,5 @@
+# jsonb_ivm extension
+comment = 'Incremental JSONB View Maintenance for CQRS Architectures'
+default_version = '0.1.0'
+module_pathname = '$libdir/jsonb_ivm'
+relocatable = true

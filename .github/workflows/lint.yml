@@ -1,0 +1,37 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format postgresql-server-dev-17
+
+      - name: Check C code formatting
+        run: |
+          clang-format --dry-run --Werror jsonb_ivm.c
+
+      - name: Build with warnings as errors
+        run: |
+          make clean
+          make CFLAGS="-Wall -Wextra -Werror"
+
+      - name: Check for trailing whitespace
+        run: |
+          if git grep -I --line-number '[[:blank:]]$' -- '*.c' '*.sql' '*.md' 2>/dev/null; then
+            echo "Error: Found trailing whitespace (see above)"
+            exit 1
+          fi

@@ -1,0 +1,63 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: PostgreSQL ${{ matrix.pg-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pg-version: [13, 14, 15, 16, 17]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL ${{ matrix.pg-version }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-${{ matrix.pg-version }} \
+            postgresql-server-dev-${{ matrix.pg-version }}
+
+      - name: Build extension
+        run: |
+          make clean
+          make PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+
+      - name: Install extension
+        run: |
+          sudo make install PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+
+      - name: Start PostgreSQL
+        run: |
+          sudo systemctl start postgresql@${{ matrix.pg-version }}-main
+          sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
+
+      - name: Run tests
+        run: |
+          make installcheck PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+
+      - name: Show test results on failure
+        if: failure()
+        run: |
+          cat regression.diffs || echo "No regression.diffs found"
+          cat regression.out || echo "No regression.out found"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-pg${{ matrix.pg-version }}
+          path: |
+            regression.diffs
+            regression.out
+            test/results/
+          if-no-files-found: ignore
