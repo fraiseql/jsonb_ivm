@@ -36,10 +36,7 @@ pgrx::pg_module_magic!();
 /// - Performs shallow merge only (nested objects are replaced, not merged)
 /// - For deeply nested updates, use `jsonb_merge_at_path` (planned for v0.2.0)
 #[pg_extern(immutable, parallel_safe, strict)]
-fn jsonb_merge_shallow(
-    target: Option<JsonB>,
-    source: Option<JsonB>,
-) -> Option<JsonB> {
+fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<JsonB> {
     // Handle NULL inputs - marked with `strict` so PostgreSQL handles this,
     // but we keep explicit handling for clarity
     let target = target?;
@@ -107,8 +104,8 @@ mod tests {
         let target = JsonB(json!({"a": 1, "b": 2}));
         let source = JsonB(json!({"c": 3}));
 
-        let result = crate::jsonb_merge_shallow(Some(target), Some(source))
-            .expect("merge should succeed");
+        let result =
+            crate::jsonb_merge_shallow(Some(target), Some(source)).expect("merge should succeed");
 
         assert_eq!(result.0, json!({"a": 1, "b": 2, "c": 3}));
     }
@@ -118,8 +115,8 @@ mod tests {
         let target = JsonB(json!({"a": 1, "b": 2}));
         let source = JsonB(json!({"b": 99, "c": 3}));
 
-        let result = crate::jsonb_merge_shallow(Some(target), Some(source))
-            .expect("merge should succeed");
+        let result =
+            crate::jsonb_merge_shallow(Some(target), Some(source)).expect("merge should succeed");
 
         // Source value (99) should overwrite target value (2)
         assert_eq!(result.0, json!({"a": 1, "b": 99, "c": 3}));
@@ -130,8 +127,8 @@ mod tests {
         let target = JsonB(json!({"a": 1}));
         let source = JsonB(json!({}));
 
-        let result = crate::jsonb_merge_shallow(Some(target), Some(source))
-            .expect("merge should succeed");
+        let result =
+            crate::jsonb_merge_shallow(Some(target), Some(source)).expect("merge should succeed");
 
         assert_eq!(result.0, json!({"a": 1}));
     }

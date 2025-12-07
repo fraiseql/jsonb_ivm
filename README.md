@@ -190,9 +190,41 @@ SELECT jsonb_merge_shallow(
 ```
 
 **Performance:**
-- Delegates to PostgreSQL's internal `jsonb_concat` operator
-- O(n + m) where n = target keys, m = source keys
-- Minimal memory overhead
+- Manual merge implementation using Rust HashMap operations
+- O(n + m) time complexity: n = target keys, m = source keys
+- Memory usage: Creates new JSONB with cloned keys/values from both objects
+- Prioritizes type safety and maintainability over raw performance
+- See [performance benchmarks](test/benchmark_comparison.sql) for detailed comparisons
+
+**Performance Characteristics:**
+- Small objects (10 keys): ~5-10ms per 10,000 merges
+- Medium objects (50 keys): ~50-100ms per 1,000 merges
+- Large objects (150 keys): ~50-150ms per 100 merges
+- For maximum performance on simple merges, consider native `||` operator (see "When to Use" below)
+
+**When to Use This Extension:**
+
+Use `jsonb_merge_shallow` when:
+- ✅ Building CQRS materialized views with incremental updates
+- ✅ You want explicit, readable merge operations (`jsonb_merge_shallow` vs `||`)
+- ✅ Type safety is important (errors on array/scalar merge, native `||` allows)
+- ✅ You'll use future features (`jsonb_merge_at_path` for nested merging)
+- ✅ Clear error messages matter (shows actual type received)
+
+Use native `||` operator when:
+- ✅ Maximum performance is critical (native C implementation)
+- ✅ You need to merge arrays or mixed types
+- ✅ You want minimal dependencies (built-in PostgreSQL)
+- ✅ Working with complex JSONB manipulations using built-in functions
+
+**Example Comparison:**
+```sql
+-- Extension (type-safe, explicit, readable):
+UPDATE orders SET data = jsonb_merge_shallow(data, new_customer_data);
+
+-- Native (faster, more flexible, built-in):
+UPDATE orders SET data = data || new_customer_data;
+```
 
 ---
 
