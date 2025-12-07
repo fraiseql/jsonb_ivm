@@ -6,32 +6,99 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  lint:
-    name: Code Quality
+  format:
+    name: Rust Format Check
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check Rust formatting
+        run: cargo fmt -- --check
+
+  clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install PostgreSQL dev headers
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format postgresql-server-dev-17
+          sudo apt-get install -y postgresql-server-dev-17
 
-      - name: Check C code formatting
-        run: |
-          clang-format --dry-run --Werror jsonb_ivm.c
+      - name: Install cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.12.8
 
-      - name: Build with warnings as errors
-        run: |
-          make clean
-          make CFLAGS="-Wall -Wextra -Werror"
+      - name: Initialize pgrx
+        run: cargo pgrx init
 
-      - name: Check for trailing whitespace
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+
+  docs:
+    name: Documentation Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install PostgreSQL dev headers
         run: |
-          if git grep -I --line-number '[[:blank:]]$' -- '*.c' '*.sql' '*.md' 2>/dev/null; then
-            echo "Error: Found trailing whitespace (see above)"
-            exit 1
-          fi
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-17
+
+      - name: Install cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.12.8
+
+      - name: Initialize pgrx
+        run: cargo pgrx init
+
+      - name: Build documentation
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings

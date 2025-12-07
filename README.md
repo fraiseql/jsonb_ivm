@@ -15,14 +15,37 @@
 
 ### Installation
 
+**From source (requires Rust):**
+
 ```bash
-# Build from source
+# Install Rust if not already installed
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install cargo-pgrx
+cargo install --locked cargo-pgrx
+
+# Initialize pgrx (one-time setup)
+cargo pgrx init
+
+# Clone and build
 git clone https://github.com/fraiseql/jsonb_ivm.git
 cd jsonb_ivm
-make clean && make
-sudo make install
+cargo pgrx install --release
 
 # Load extension in your database
+psql -d your_database -c "CREATE EXTENSION jsonb_ivm;"
+```
+
+**From binary release (PostgreSQL 13-17):**
+
+```bash
+# Download release for your PostgreSQL version
+wget https://github.com/fraiseql/jsonb_ivm/releases/download/v0.1.0-alpha1/jsonb_ivm-v0.1.0-alpha1-pg17.tar.gz
+
+# Extract to PostgreSQL extension directory
+sudo tar xzf jsonb_ivm-v0.1.0-alpha1-pg17.tar.gz -C $(pg_config --sharedir)/extension
+
+# Load extension
 psql -d your_database -c "CREATE EXTENSION jsonb_ivm;"
 ```
 
