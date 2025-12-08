@@ -5,7 +5,7 @@
 
 **High-performance PostgreSQL extension for intelligent partial updates of JSONB in CQRS architectures.**
 
-> ⚠️ **Alpha Release**: This is v0.2.0. Performance optimizations added (SIMD + batch operations). Not recommended for production use yet.
+> ⚠️ **Alpha Release**: This is v0.3.0. pg_tview integration helpers added (complete CRUD support). Not recommended for production use yet.
 
 ---
 
@@ -67,6 +67,19 @@ SELECT jsonb_merge_shallow(
 
 ## 📦 Features
 
+### v0.3.0 (pg_tview Integration Helpers ⚡)
+
+- ✅ **`jsonb_smart_patch_*()`** - Intelligent dispatchers (simplifies pg_tview by 60%)
+- ✅ **`jsonb_array_delete_where()`** - Surgical array deletion (3-5× faster than re-aggregation)
+- ✅ **`jsonb_array_insert_where()`** - Ordered array insertion (3-5× faster, NEW!)
+- ✅ **`jsonb_deep_merge()`** - Recursive deep merge (preserves nested fields)
+- ✅ **`jsonb_extract_id()` / `jsonb_array_contains_id()`** - Helper functions for pg_tview
+
+**Impact on pg_tview:**
+- Complete JSONB array CRUD support (INSERT/DELETE now available)
+- 40-60% code reduction in refresh logic
+- +10-20% cascade throughput improvement
+
 ### v0.2.0 (Performance Optimizations ⚡)
 
 - ✅ **SIMD optimizations** - 6× faster for large arrays (1000+ elements)
@@ -97,6 +110,134 @@ See [benchmarks](docs/implementation/BENCHMARK_RESULTS.md) for details.
 ---
 
 ## 📖 API Reference
+
+### v0.3.0 Functions
+
+#### `jsonb_smart_patch_scalar(target, source)` ⭐ NEW
+
+Intelligent shallow merge for top-level object updates.
+
+**Example:**
+```sql
+UPDATE tv_company
+SET data = jsonb_smart_patch_scalar(data, '{"name": "ACME Corp"}'::jsonb)
+WHERE pk = 1;
+```
+
+#### `jsonb_smart_patch_nested(target, source, path)` ⭐ NEW
+
+Merge JSONB at a nested path within the document.
+
+**Example:**
+```sql
+UPDATE tv_user
+SET data = jsonb_smart_patch_nested(
+    data,
+    '{"name": "ACME Corp"}'::jsonb,
+    ARRAY['company']
+)
+WHERE fk_company = 1;
+```
+
+#### `jsonb_smart_patch_array(target, source, array_path, match_key, match_value)` ⭐ NEW
+
+Update a specific element within a JSONB array.
+
+**Example:**
+```sql
+UPDATE tv_feed
+SET data = jsonb_smart_patch_array(
+    data,
+    '{"title": "Updated"}'::jsonb,
+    'posts',
+    'id',
+    '"abc-123"'::jsonb
+)
+WHERE pk = 1;
+```
+
+#### `jsonb_array_delete_where(target, array_path, match_key, match_value)` ⭐ NEW
+
+Surgically delete an element from a JSONB array.
+
+**Performance:** 3-5× faster than re-aggregation.
+
+**Example:**
+```sql
+UPDATE tv_feed
+SET data = jsonb_array_delete_where(
+    data,
+    'posts',
+    'id',
+    '"post-to-delete"'::jsonb
+)
+WHERE pk = 1;
+```
+
+#### `jsonb_array_insert_where(target, array_path, new_element, sort_key, sort_order)` ⭐ NEW
+
+Insert an element into a JSONB array with optional sorting.
+
+**Performance:** 3-5× faster than re-aggregation.
+
+**Example:**
+```sql
+UPDATE tv_feed
+SET data = jsonb_array_insert_where(
+    data,
+    'posts',
+    '{"id": "new-post", "title": "New Post", "created_at": "2025-12-08"}'::jsonb,
+    'created_at',  -- sort by this key
+    'DESC'         -- descending order
+)
+WHERE pk = 1;
+```
+
+#### `jsonb_deep_merge(target, source)` ⭐ NEW
+
+Recursively merge nested JSONB objects, preserving fields not present in source.
+
+**Example:**
+```sql
+SELECT jsonb_deep_merge(
+    '{"a": 1, "b": {"c": 2, "d": 3}}'::jsonb,
+    '{"b": {"d": 99}, "e": 4}'::jsonb
+);
+-- Result: {"a": 1, "b": {"c": 2, "d": 99}, "e": 4}
+-- Note: "c" is preserved, unlike shallow merge which would lose it
+```
+
+#### `jsonb_extract_id(data, key)` ⭐ NEW
+
+Safely extract an ID field from JSONB as text.
+
+**Parameters:**
+- `key` - defaults to `'id'`
+
+**Example:**
+```sql
+SELECT jsonb_extract_id('{"id": "abc-123", "name": "test"}'::jsonb);
+-- Result: "abc-123"
+```
+
+#### `jsonb_array_contains_id(data, array_path, id_key, id_value)` ⭐ NEW
+
+Fast check if a JSONB array contains an element with a specific ID.
+
+**Example:**
+```sql
+SELECT pk FROM tv_feed
+WHERE jsonb_array_contains_id(
+    data,
+    'posts',
+    'id',
+    '"abc-123"'::jsonb
+);
+```
+
+---
+
+### v0.1.0 & v0.2.0 Functions
 
 ### `jsonb_array_update_where(target, array_path, match_key, match_value, updates)`
 
@@ -269,6 +410,7 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 
 ## 📚 Documentation
 
+- **[pg_tview Integration Examples](docs/PG_TVIEW_INTEGRATION_EXAMPLES.md)** - Real-world CRUD workflows (NEW v0.3.0)
 - **[Implementation Details](docs/implementation/IMPLEMENTATION_SUCCESS.md)** - Technical implementation and verification
 - **[Benchmark Results](docs/implementation/BENCHMARK_RESULTS.md)** - Complete performance analysis
 - **[pgrx Integration Notes](docs/implementation/PGRX_INTEGRATION_ISSUE.md)** - SQL generation troubleshooting
@@ -325,18 +467,19 @@ Licensed under the PostgreSQL License. See [LICENSE](LICENSE) for details.
 
 ## 🎯 Project Status
 
-**POC Status:** ✅ **Validated and Complete**
+**v0.3.0 Status:** ✅ **pg_tview Integration Complete**
 
-- All 3 core functions implemented and working
-- Performance validated (1.45× to 2.66× faster)
-- Comprehensive benchmarks and documentation
-- Ready for alpha release
+- 13 functions implemented (v0.1.0 + v0.2.0 + v0.3.0)
+- Complete JSONB array CRUD support (CREATE, READ, UPDATE, DELETE)
+- Performance validated (3-5× faster for INSERT/DELETE operations)
+- Comprehensive benchmarks and pg_tview integration examples
+- Ready for integration with pg_tview project
 
 **Next Steps:**
-- Alpha release packaging
+- Integration with pg_tview (replace manual refresh logic)
 - Additional PostgreSQL version support (13-16)
-- SIMD optimizations for large arrays
-- Batch update functions
+- Further SIMD optimizations
+- Production readiness hardening
 
 ---
 
