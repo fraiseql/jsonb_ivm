@@ -1013,6 +1013,160 @@ fn deep_merge_recursive(mut target: Value, source: Value) -> Value {
     }
 }
 
+// ===== HELPER UTILITIES =====
+
+/// Extract ID value from JSONB document
+///
+/// Simplifies ID extraction for pg_tview implementations by providing a safe,
+/// type-flexible ID extraction function.
+///
+/// # Arguments
+///
+/// * `data` - JSONB document containing the ID
+/// * `key` - Key to extract (default: 'id')
+///
+/// # Returns
+///
+/// ID value as text, or NULL if not found or invalid type
+///
+/// # Supported ID Types
+///
+/// - **String**: UUID, custom IDs (returned as-is)
+/// - **Number**: Integer IDs (converted to string)
+/// - **Other types**: Returns NULL (boolean, null, array, object)
+///
+/// # Examples
+///
+/// ```sql
+/// -- UUID extraction
+/// SELECT jsonb_extract_id('{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "Alice"}'::jsonb);
+/// -- Returns: '550e8400-e29b-41d4-a716-446655440000'
+///
+/// -- Integer extraction
+/// SELECT jsonb_extract_id('{"id": 42, "title": "Post"}'::jsonb);
+/// -- Returns: '42'
+///
+/// -- Custom key
+/// SELECT jsonb_extract_id('{"post_id": 123, "title": "..."}'::jsonb, 'post_id');
+/// -- Returns: '123'
+///
+/// -- Not found
+/// SELECT jsonb_extract_id('{"name": "Alice"}'::jsonb);
+/// -- Returns: NULL
+///
+/// -- Invalid type (boolean)
+/// SELECT jsonb_extract_id('{"id": true}'::jsonb);
+/// -- Returns: NULL
+///
+/// -- pg_tview usage: Extract ID for propagation
+/// SELECT jsonb_extract_id(data) AS user_id
+/// FROM tv_user
+/// WHERE jsonb_extract_id(data, 'company_id') = '123';
+/// ```
+#[pg_extern(immutable, parallel_safe)]
+fn jsonb_extract_id(data: JsonB, key: default!(&str, "'id'")) -> Option<String> {
+    let obj = data.0.as_object()?;
+    let id_value = obj.get(key)?;
+
+    match id_value {
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }
+}
+
+/// Check if JSONB array contains element with specific ID
+///
+/// Fast containment check for pg_tview implementations, with optimized
+/// search for integer IDs using loop unrolling.
+///
+/// # Arguments
+///
+/// * `data` - JSONB document containing the array
+/// * `array_path` - Path to array field (e.g., 'posts')
+/// * `id_key` - Key to match on (e.g., 'id')
+/// * `id_value` - Value to search for
+///
+/// # Returns
+///
+/// true if array contains element with matching ID, false otherwise
+///
+/// # Performance
+///
+/// - **Integer IDs**: Uses `find_by_int_id_optimized()` with loop unrolling (~100ns/element)
+/// - **Non-integer IDs**: Generic search (~200ns/element)
+///
+/// # Examples
+///
+/// ```sql
+/// -- Integer ID (uses optimized search)
+/// SELECT jsonb_array_contains_id(
+///     '{"posts": [{"id": 1}, {"id": 2}, {"id": 3}]}'::jsonb,
+///     'posts',
+///     'id',
+///     '2'::jsonb
+/// );
+/// -- Returns: true
+///
+/// -- UUID (generic search)
+/// SELECT jsonb_array_contains_id(
+///     '{"posts": [{"id": "550e8400-..."}, {"id": "660f9500-..."}]}'::jsonb,
+///     'posts',
+///     'id',
+///     '"550e8400-..."'::jsonb
+/// );
+/// -- Returns: true
+///
+/// -- Not found
+/// SELECT jsonb_array_contains_id(
+///     '{"posts": [{"id": 1}, {"id": 2}]}'::jsonb,
+///     'posts',
+///     'id',
+///     '999'::jsonb
+/// );
+/// -- Returns: false
+///
+/// -- Array doesn't exist
+/// SELECT jsonb_array_contains_id(
+///     '{"other": []}'::jsonb,
+///     'posts',
+///     'id',
+///     '1'::jsonb
+/// );
+/// -- Returns: false
+///
+/// -- pg_tview usage: Check if feed contains post
+/// SELECT pk_feed FROM tv_feed
+/// WHERE jsonb_array_contains_id(data, 'posts', 'id', '123'::jsonb);
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_array_contains_id(
+    data: JsonB,
+    array_path: &str,
+    id_key: &str,
+    id_value: JsonB,
+) -> bool {
+    let obj = match data.0.as_object() {
+        Some(o) => o,
+        None => return false,
+    };
+
+    let array = match obj.get(array_path).and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => return false,
+    };
+
+    // Use optimized search if ID is integer
+    if let Some(int_id) = id_value.0.as_i64() {
+        find_by_int_id_optimized(array, id_key, int_id).is_some()
+    } else {
+        // Generic search for non-integer IDs
+        array.iter().any(|elem| {
+            elem.get(id_key).map(|v| v == &id_value.0).unwrap_or(false)
+        })
+    }
+}
+
 /// Helper function to get human-readable type name for error messages
 fn value_type_name(value: &Value) -> &'static str {
     match value {
