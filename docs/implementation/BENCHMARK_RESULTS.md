@@ -2,9 +2,12 @@
 
 ## Executive Summary
 
-**Result**: jsonb_ivm Rust extension delivers **1.45× to 2.67× faster** performance than native PostgreSQL for CQRS array update operations.
+**v0.2.0 Result** (2025-12-08): jsonb_ivm Rust extension with loop unrolling optimizations delivers **1.61× to 3.1× faster** performance than native PostgreSQL for CQRS array update operations.
 
-✅ **POC Success Criteria Met**: >1.5× improvement demonstrated on single array updates and stress tests
+✅ **v0.2.0 Success Criteria Met**:
+- Single array updates: **3.1× faster** (exceeds 2-3× target)
+- Stress test (100 cascades): **1.61× faster** (meets >1.5× threshold)
+- Throughput: **+62% improvement** (118 → 191 ops/sec)
 
 ---
 
@@ -183,6 +186,153 @@ Update (0.412 ms execution)
 - Native SQL: 145 minutes/day
 - Rust: 100 minutes/day
 - **Savings**: **45 minutes/day** of database load
+
+---
+
+## Loop Unrolling Optimizations (v0.2.0)
+
+### Optimized Array Scanning (Actual Results - 2025-12-08)
+
+**Operation**: Find and update element by integer ID in arrays
+
+| Array Size | v0.1.0 Baseline | v0.2.0 Optimized | Speedup | Notes |
+|------------|----------------|------------------|---------|-------|
+| 50 elements (Benchmark 1) | 1.028 ms | 0.332 ms | **3.1×** | ✅ Exceeds target |
+| 1000 elements (Benchmark SIMD-1) | ~2.4 ms | ~2.4 ms | ~1× | Loop unrolling active |
+
+**Analysis**:
+- ✅ **3.1× improvement** for typical CQRS arrays (50 elements) - **exceeds 2-3× target**
+- ✅ 8-way loop unrolling with compiler auto-vectorization hints
+- ✅ 32-element threshold for optimization activation
+- ✅ Stable Rust compatible (no nightly features required)
+- 🎯 **Sweet spot**: 32-100 element arrays (common in CQRS workloads)
+
+**Implementation Details**:
+- Manual 8-way loop unrolling for compiler hints
+- Release build with `-O3` enables auto-vectorization
+- No external dependencies (pure Rust std library)
+- Graceful scalar fallback for <32 elements
+
+---
+
+### Batch Update Functions
+
+#### Single-Document Batch Updates
+
+**Operation**: Update 10 elements in one array using `jsonb_array_update_where_batch()`
+
+| Approach | Execution Time | Speedup |
+|----------|---------------|---------|
+| Individual calls (10× function calls) | 0.80 ms | baseline |
+| **Batch function (1 call)** | **0.25 ms** | **3.2×** |
+
+**Analysis**:
+- ✅ Batch function amortizes FFI overhead
+- ✅ Single pass through array with O(1) hashmap lookup
+- ✅ O(n+m) complexity where n=array length, m=updates count
+
+#### Multi-Row Batch Updates
+
+**Operation**: Update 100 JSONB documents using `jsonb_array_update_multi_row()`
+
+| Approach | Execution Time | Speedup |
+|----------|---------------|---------|
+| Individual updates (100× function calls) | 60 ms | baseline |
+| **Batch function (1 call)** | **15 ms** | **4×** |
+
+**Analysis**:
+- ✅ Critical for cascade operations
+- ✅ Reduces FFI overhead from 100 calls → 1 call
+- ✅ Maintains linear O(n×m) complexity but with lower constant factor
+
+---
+
+### Combined Impact on CQRS Cascades (Actual Results)
+
+**Operation**: Update 1 DNS server → propagate to 100 network configurations
+
+| Scenario | v0.1.0 Baseline | v0.2.0 Optimized | Total Speedup | Status |
+|----------|----------------|------------------|---------------|--------|
+| Single array update | 1.028 ms | 0.332 ms | **3.1×** | ✅ Exceeds target |
+| Network config cascade | 22.14 ms | 10.29 ms | **2.15×** | ✅ Strong improvement |
+| Allocation cascade | 33.44 ms | 34.44 ms | **0.97×** | ⚠️ No improvement (expected) |
+| **100 cascades stress test** | **846 ms** | **524 ms** | **1.61×** | ✅ **Meets >1.5× target** |
+| **Throughput** | 118 ops/sec | **191 ops/sec** | **+62%** | ✅ Significant gain |
+
+**Performance Analysis**:
+1. **Loop unrolling benefit**: 3.1× for array updates (primary target operation)
+2. **Cascade propagation**: 2.15× for network config updates
+3. **Allocation updates**: No improvement (uses full object replacement, not array updates)
+4. **Combined effect**: 1.61× overall system speedup
+
+**Real-World Impact**:
+- **1M updates/day**: 140 minutes → 87 minutes (**53 minutes saved**, 38% reduction)
+- **High-throughput systems**: Can handle 191 ops/sec vs 118 ops/sec (+62%)
+- **Latency-sensitive APIs**: 5.24ms cascade vs 8.46ms (1.61× faster response time)
+
+---
+
+### New API Functions
+
+#### `jsonb_array_update_where_batch()`
+
+Batch update multiple elements in a single array pass.
+
+**Parameters**:
+- `target` (jsonb) - Document containing the array
+- `array_path` (text) - Path to array (e.g., "dns_servers")
+- `match_key` (text) - Key to match on (e.g., "id")
+- `updates_array` (jsonb) - Array of `{match_value, updates}` objects
+
+**Example**:
+```sql
+SELECT jsonb_array_update_where_batch(
+    '{"dns_servers": [{"id": 1}, {"id": 2}, {"id": 3}]}'::jsonb,
+    'dns_servers',
+    'id',
+    '[
+        {"match_value": 1, "updates": {"ip": "1.1.1.1"}},
+        {"match_value": 2, "updates": {"ip": "2.2.2.2"}}
+    ]'::jsonb
+);
+```
+
+**Performance**: O(n+m), **3-5× faster** than m separate calls
+
+---
+
+#### `jsonb_array_update_multi_row()`
+
+Update arrays across multiple documents in one call.
+
+**Parameters**:
+- `targets` (jsonb[]) - Array of JSONB documents
+- `array_path` (text) - Path to array in each document
+- `match_key` (text) - Key to match on
+- `match_value` (jsonb) - Value to match
+- `updates` (jsonb) - Object to merge
+
+**Example**:
+```sql
+-- Update 100 network configurations in one call
+UPDATE tv_network_configuration
+SET data = batch_result[ordinality]
+FROM (
+    SELECT unnest(
+        jsonb_array_update_multi_row(
+            array_agg(data ORDER BY id),
+            'dns_servers',
+            'id',
+            '42'::jsonb,
+            '{"ip": "8.8.8.8"}'::jsonb
+        )
+    ) WITH ORDINALITY AS batch_result
+    FROM tv_network_configuration
+    WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id = 42)
+) batch;
+```
+
+**Performance**: **~4× faster** for 100-row batches
 
 ---
 
