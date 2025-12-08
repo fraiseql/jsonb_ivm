@@ -928,6 +928,91 @@ fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     }
 }
 
+// ===== DEEP MERGE =====
+
+/// Recursively merge two JSONB documents
+///
+/// Performs a deep merge where nested objects are merged recursively rather than replaced.
+/// This preserves all fields in nested objects while allowing specific field updates.
+///
+/// # Arguments
+///
+/// * `target` - Base JSONB document
+/// * `source` - JSONB document to merge (recursively)
+///
+/// # Returns
+///
+/// Deeply merged JSONB document
+///
+/// # Behavior
+///
+/// - **Objects**: Recursively merged (source fields overwrite target fields)
+/// - **Arrays**: Replaced entirely (source replaces target)
+/// - **Scalars**: Source value replaces target value
+///
+/// # Examples
+///
+/// ```sql
+/// -- Simple nested merge
+/// SELECT jsonb_deep_merge(
+///     '{"a": {"b": 1, "c": 2}}'::jsonb,
+///     '{"a": {"c": 3, "d": 4}}'::jsonb
+/// );
+/// -- Result: {"a": {"b": 1, "c": 3, "d": 4}}
+///
+/// -- Deep nested merge (3 levels)
+/// SELECT jsonb_deep_merge(
+///     '{"level1": {"level2": {"level3": {"a": 1, "b": 2}}}}'::jsonb,
+///     '{"level1": {"level2": {"level3": {"b": 99, "c": 3}}}}'::jsonb
+/// );
+/// -- Result: {"level1": {"level2": {"level3": {"a": 1, "b": 99, "c": 3}}}}
+///
+/// -- Array replacement (not merged)
+/// SELECT jsonb_deep_merge(
+///     '{"items": [1, 2, 3]}'::jsonb,
+///     '{"items": [4, 5]}'::jsonb
+/// );
+/// -- Result: {"items": [4, 5]}
+///
+/// -- pg_tview usage: Update nested company info
+/// UPDATE tv_user
+/// SET data = jsonb_deep_merge(
+///     data,
+///     jsonb_build_object('company', jsonb_build_object('name', 'ACME Corp'))
+/// )
+/// WHERE data->>'company_id' = '123';
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_deep_merge(target: JsonB, source: JsonB) -> JsonB {
+    let target_val = target.0;
+    let source_val = source.0;
+
+    JsonB(deep_merge_recursive(target_val, source_val))
+}
+
+/// Recursively merge two JSON values
+///
+/// If both are objects, recursively merge their keys.
+/// Otherwise, source value replaces target value.
+fn deep_merge_recursive(mut target: Value, source: Value) -> Value {
+    // If both are objects, merge recursively
+    if let (Some(target_obj), Some(source_obj)) = (target.as_object_mut(), source.as_object()) {
+        for (key, source_value) in source_obj {
+            target_obj
+                .entry(key.clone())
+                .and_modify(|target_value| {
+                    // Recursively merge if both are objects
+                    *target_value = deep_merge_recursive(target_value.clone(), source_value.clone());
+                })
+                .or_insert_with(|| source_value.clone());
+        }
+        target
+    } else {
+        // If not both objects, source wins (replaces target)
+        source
+    }
+}
+
 /// Helper function to get human-readable type name for error messages
 fn value_type_name(value: &Value) -> &'static str {
     match value {
@@ -1220,5 +1305,116 @@ mod tests {
             result.0["level1"]["level2"]["level3"],
             json!({"existing": "value", "new": "data"})
         );
+    }
+
+    // ===== DEEP MERGE TESTS =====
+
+    #[pg_test]
+    fn test_deep_merge_simple() {
+        let target = JsonB(json!({"a": {"b": 1, "c": 2}}));
+        let source = JsonB(json!({"a": {"c": 3, "d": 4}}));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        assert_eq!(result.0, json!({"a": {"b": 1, "c": 3, "d": 4}}));
+    }
+
+    #[pg_test]
+    fn test_deep_merge_nested_three_levels() {
+        let target = JsonB(json!({
+            "level1": {
+                "level2": {
+                    "level3": {"a": 1, "b": 2}
+                }
+            }
+        }));
+        let source = JsonB(json!({
+            "level1": {
+                "level2": {
+                    "level3": {"b": 99, "c": 3}
+                }
+            }
+        }));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        let expected = json!({
+            "level1": {
+                "level2": {
+                    "level3": {"a": 1, "b": 99, "c": 3}
+                }
+            }
+        });
+
+        assert_eq!(result.0, expected);
+    }
+
+    #[pg_test]
+    fn test_deep_merge_array_replacement() {
+        let target = JsonB(json!({"items": [1, 2, 3]}));
+        let source = JsonB(json!({"items": [4, 5]}));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        // Arrays are replaced, not merged
+        assert_eq!(result.0, json!({"items": [4, 5]}));
+    }
+
+    #[pg_test]
+    fn test_deep_merge_mixed_types() {
+        let target = JsonB(json!({"a": {"b": 1}}));
+        let source = JsonB(json!({"a": "replaced"}));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        // Source replaces target when types differ
+        assert_eq!(result.0, json!({"a": "replaced"}));
+    }
+
+    #[pg_test]
+    fn test_deep_merge_preserves_sibling_fields() {
+        let target = JsonB(json!({
+            "user": {
+                "name": "Alice",
+                "company": {
+                    "name": "ACME",
+                    "city": "NYC"
+                }
+            }
+        }));
+        let source = JsonB(json!({
+            "user": {
+                "company": {
+                    "name": "ACME Corp"
+                }
+            }
+        }));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        // Should preserve "name": "Alice" and "city": "NYC"
+        assert_eq!(result.0["user"]["name"], "Alice");
+        assert_eq!(result.0["user"]["company"]["name"], "ACME Corp");
+        assert_eq!(result.0["user"]["company"]["city"], "NYC");
+    }
+
+    #[pg_test]
+    fn test_deep_merge_empty_source() {
+        let target = JsonB(json!({"a": {"b": 1}}));
+        let source = JsonB(json!({}));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        assert_eq!(result.0, json!({"a": {"b": 1}}));
+    }
+
+    #[pg_test]
+    fn test_deep_merge_empty_target() {
+        let target = JsonB(json!({}));
+        let source = JsonB(json!({"a": {"b": 1}}));
+
+        let result = crate::jsonb_deep_merge(target, source);
+
+        assert_eq!(result.0, json!({"a": {"b": 1}}));
     }
 }
