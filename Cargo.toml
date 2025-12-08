@@ -9,7 +9,7 @@ homepage = "https://github.com/fraiseql/jsonb_ivm"
 repository = "https://github.com/fraiseql/jsonb_ivm"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [[bin]]
 name = "pgrx_embed_jsonb_ivm"

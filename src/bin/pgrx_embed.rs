@@ -1,4 +1,2 @@
-fn main() {
-    // This is intentionally empty.
-    // pgrx uses this to embed SQL generation
-}
+// pgrx_embed entry point for SQL generation
+::pgrx::pgrx_embed!();
