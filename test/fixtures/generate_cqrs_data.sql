@@ -26,8 +26,13 @@ BEGIN
         CASE WHEN i % 5 = 0 THEN 'inactive' ELSE 'active' END
     FROM generate_series(1, 500) i;
 
-    -- Materialized view: v_dns_server (leaf view)
-    CREATE MATERIALIZED VIEW v_dns_server AS
+    -- Table view: v_dns_server (leaf view - source of truth)
+    CREATE TABLE v_dns_server (
+        id INTEGER PRIMARY KEY,
+        data JSONB NOT NULL
+    );
+
+    INSERT INTO v_dns_server
     SELECT
         id,
         jsonb_build_object(
@@ -37,8 +42,6 @@ BEGIN
             'status', status
         ) AS data
     FROM bench_dns_servers;
-
-    CREATE INDEX idx_v_dns_server_id ON v_dns_server(id);
 
     -- Base table: Network configurations (100 records)
     CREATE TABLE bench_network_configs (
@@ -73,8 +76,13 @@ BEGIN
         (i % 50) + 1 AS priority
     FROM generate_series(1, 5000) i;
 
-    -- Materialized view: tv_network_configuration (intermediate composition)
-    CREATE MATERIALIZED VIEW tv_network_configuration AS
+    -- Table view: tv_network_configuration (projection with embedded arrays)
+    CREATE TABLE tv_network_configuration (
+        id INTEGER PRIMARY KEY,
+        data JSONB NOT NULL
+    );
+
+    INSERT INTO tv_network_configuration
     SELECT
         nc.id,
         jsonb_build_object(
@@ -91,8 +99,6 @@ BEGIN
             'created_at', nc.created_at
         ) AS data
     FROM bench_network_configs nc;
-
-    CREATE INDEX idx_tv_network_configuration_id ON tv_network_configuration(id);
 
     -- Base table: Allocations (500 records, 5 per network config)
     CREATE TABLE bench_allocations (
@@ -112,10 +118,17 @@ BEGIN
         (i % 10 + 1) * 100
     FROM generate_series(1, 500) i;
 
-    -- Materialized view: tv_allocation (top-level composition)
-    CREATE MATERIALIZED VIEW tv_allocation AS
+    -- Table view: tv_allocation (top-level projection)
+    CREATE TABLE tv_allocation (
+        id INTEGER PRIMARY KEY,
+        network_id INTEGER,  -- FK for efficient updates
+        data JSONB NOT NULL
+    );
+
+    INSERT INTO tv_allocation
     SELECT
         a.id,
+        a.network_configuration_id,
         jsonb_build_object(
             'id', a.id,
             'name', a.name,
@@ -132,8 +145,7 @@ BEGIN
     FROM bench_allocations a
     LEFT JOIN tv_network_configuration nc ON nc.id = a.network_configuration_id;
 
-    CREATE INDEX idx_tv_allocation_id ON tv_allocation(id);
-    CREATE INDEX idx_tv_allocation_nc_id ON tv_allocation((data->'network_configuration'->>'id'));
+    CREATE INDEX idx_tv_allocation_network_id ON tv_allocation(network_id);
 
     RAISE NOTICE 'Test data generated successfully:';
     RAISE NOTICE '  - 500 DNS servers';
