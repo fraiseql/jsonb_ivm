@@ -2,12 +2,10 @@
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13%2B-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-PostgreSQL-blue.svg)](LICENSE)
-[![Test](https://github.com/fraiseql/jsonb_ivm/actions/workflows/test.yml/badge.svg)](https://github.com/fraiseql/jsonb_ivm/actions/workflows/test.yml)
-[![Lint](https://github.com/fraiseql/jsonb_ivm/actions/workflows/lint.yml/badge.svg)](https://github.com/fraiseql/jsonb_ivm/actions/workflows/lint.yml)
 
-**High-performance PostgreSQL extension for intelligent partial updates of JSONB materialized views in CQRS architectures.**
+**High-performance PostgreSQL extension for intelligent partial updates of JSONB in CQRS architectures.**
 
-> ⚠️ **Alpha Release**: This is v0.1.0-alpha1. API may change. Not recommended for production use yet.
+> ⚠️ **Alpha Release**: This is v0.1.0. POC validated. Not recommended for production use yet.
 
 ---
 
@@ -15,7 +13,7 @@
 
 ### Installation
 
-**From source (requires Rust):**
+**From source (requires Rust + pgrx):**
 
 ```bash
 # Install Rust if not already installed
@@ -32,215 +30,211 @@ git clone https://github.com/fraiseql/jsonb_ivm.git
 cd jsonb_ivm
 cargo pgrx install --release
 
-# Load extension in your database
+# Create extension in PostgreSQL
 psql -d your_database -c "CREATE EXTENSION jsonb_ivm;"
 ```
 
-**From binary release (PostgreSQL 13-17):**
-
-```bash
-# Download release for your PostgreSQL version
-wget https://github.com/fraiseql/jsonb_ivm/releases/download/v0.1.0-alpha1/jsonb_ivm-v0.1.0-alpha1-pg17.tar.gz
-
-# Extract to PostgreSQL extension directory
-sudo tar xzf jsonb_ivm-v0.1.0-alpha1-pg17.tar.gz -C $(pg_config --sharedir)/extension
-
-# Load extension
-psql -d your_database -c "CREATE EXTENSION jsonb_ivm;"
-```
-
-### Usage
+### Basic Usage
 
 ```sql
--- Merge JSONB objects (shallow)
+-- Update single element in JSONB array (2.66× faster than native SQL)
+SELECT jsonb_array_update_where(
+    '{"dns_servers": [{"id": 42, "ip": "1.1.1.1"}, {"id": 43, "ip": "2.2.2.2"}]}'::jsonb,
+    'dns_servers',  -- array path
+    'id',           -- match key
+    '42'::jsonb,    -- match value
+    '{"ip": "8.8.8.8"}'::jsonb  -- updates to apply
+);
+-- → {"dns_servers": [{"id": 42, "ip": "8.8.8.8"}, {"id": 43, "ip": "2.2.2.2"}]}
+
+-- Merge JSONB at specific path
+SELECT jsonb_merge_at_path(
+    '{"config": {"name": "old", "ttl": 300}}'::jsonb,
+    '{"name": "new"}'::jsonb,
+    ARRAY['config']
+);
+-- → {"config": {"name": "new", "ttl": 300}}
+
+-- Shallow merge
 SELECT jsonb_merge_shallow(
     '{"a": 1, "b": 2}'::jsonb,
     '{"b": 99, "c": 3}'::jsonb
 );
 -- → {"a": 1, "b": 99, "c": 3}
-
--- Use in triggers for incremental view updates
-CREATE TRIGGER sync_customer_updates
-AFTER UPDATE ON tb_customers
-FOR EACH ROW
-EXECUTE FUNCTION update_tv_orders();
-
-CREATE FUNCTION update_tv_orders()
-RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE tv_orders
-    SET data = jsonb_merge_shallow(
-        data,
-        jsonb_build_object(
-            'customer_name', NEW.name,
-            'customer_email', NEW.email
-        )
-    )
-    WHERE customer_id = NEW.id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
 ```
 
 ---
 
 ## 📦 Features
 
-### v0.1.0-alpha1
-- ✅ `jsonb_merge_shallow(target, source)` - Shallow JSONB merge
-- ✅ PostgreSQL 13-17 compatible
-- ✅ IMMUTABLE, PARALLEL SAFE for query optimization
-- ✅ Comprehensive test suite (12 tests)
-- ✅ CI/CD on multiple PostgreSQL versions
-- ✅ Zero compiler warnings enforcement
-- ✅ Automated code quality checks
+### v0.1.0 (POC Complete ✅)
 
-### Coming in Future Alphas
-- ⏳ Nested path merge (`jsonb_merge_at_path`)
-- ⏳ Change detection (`jsonb_detect_changes`)
-- ⏳ Scope building system
-- ⏳ Complete CQRS integration examples
+- ✅ **`jsonb_array_update_where()`** - Surgical array element updates (2.66× faster)
+- ✅ **`jsonb_merge_at_path()`** - Merge JSONB at nested paths
+- ✅ **`jsonb_merge_shallow()`** - Shallow JSONB merge
+- ✅ **PostgreSQL 17** compatible (pgrx 0.12.8)
+- ✅ **Performance validated**: 1.45× to 2.66× faster than native SQL
+- ✅ **Production-ready throughput**: +46% improvement
+- ✅ **Comprehensive benchmarks** included
+
+### Performance Highlights
+
+| Operation | Native SQL | Rust Extension | Speedup |
+|-----------|-----------|----------------|---------|
+| Single array update | 1.91 ms | **0.72 ms** | **2.66×** |
+| Array-heavy cascade | 22.14 ms | **10.67 ms** | **2.08×** |
+| 100 cascades (stress) | 870 ms | **600 ms** | **1.45×** |
+
+See [benchmarks](docs/implementation/BENCHMARK_RESULTS.md) for details.
+
+---
+
+## 📖 API Reference
+
+### `jsonb_array_update_where(target, array_path, match_key, match_value, updates)`
+
+Updates a single element in a JSONB array by matching a key-value predicate.
+
+**Parameters:**
+- `target` (jsonb) - JSONB document containing the array
+- `array_path` (text) - Path to the array (e.g., `'dns_servers'`)
+- `match_key` (text) - Key to match on (e.g., `'id'`)
+- `match_value` (jsonb) - Value to match (e.g., `'42'::jsonb`)
+- `updates` (jsonb) - JSONB object to merge into matched element
+
+**Returns:** Updated JSONB document
+
+**Performance:** O(n) where n = array length. 2-3× faster than native SQL re-aggregation.
+
+---
+
+### `jsonb_merge_at_path(target, source, path)`
+
+Merges a JSONB object at a specific nested path.
+
+**Parameters:**
+- `target` (jsonb) - Base JSONB document
+- `source` (jsonb) - JSONB object to merge
+- `path` (text[]) - Path array (e.g., `ARRAY['network', 'config']`)
+
+**Returns:** Updated JSONB with source merged at path
+
+**Performance:** O(depth) where depth = path length. Efficient for deep updates.
+
+---
+
+### `jsonb_merge_shallow(target, source)`
+
+Merges top-level keys from source into target (shallow merge).
+
+**Parameters:**
+- `target` (jsonb) - Base JSONB object
+- `source` (jsonb) - JSONB object whose keys will be merged
+
+**Returns:** New JSONB object with merged keys
+
+**Behavior:** Source keys overwrite target keys on conflict. Nested objects are replaced, not recursively merged.
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run test suite
-make installcheck
+# Run Rust test suite
+cargo pgrx test --release
 
-# All tests passing: 12/12 ✅
+# Run performance benchmarks
+psql -d postgres -f test/benchmark_array_update_where.sql
 ```
 
-Test suite covers:
-- Basic merge operations
-- NULL handling
-- Empty objects
-- Overlapping keys
-- Nested objects (shallow replacement)
-- Different value types (strings, numbers, booleans, arrays, objects)
-- Large objects (150 keys)
-- Unicode support (emoji, international characters)
-- Type validation errors
+Test coverage:
+- ✅ All 3 functions with edge cases
+- ✅ NULL handling (strict attribute)
+- ✅ Type validation
+- ✅ Performance benchmarks vs native SQL
+
+---
+
+## 📊 Use Cases
+
+### CQRS Incremental View Maintenance
+
+**Scenario:** Update DNS server affecting 100 network configurations
+
+**Before (Native SQL):**
+```sql
+-- Re-aggregate entire array (slow!)
+UPDATE tv_network_configuration
+SET data = jsonb_set(data, '{dns_servers}', (
+    SELECT jsonb_agg(v.data ORDER BY m.priority)
+    FROM bench_nc_dns_mapping m
+    JOIN v_dns_server v ON v.id = m.dns_server_id
+    WHERE m.network_configuration_id = tv_network_configuration.id
+))
+WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id = 42);
+-- Time: ~22ms for 100 rows
+```
+
+**After (Rust Extension):**
+```sql
+-- Surgical update (fast!)
+UPDATE tv_network_configuration
+SET data = jsonb_array_update_where(
+    data,
+    'dns_servers',
+    'id',
+    '42'::jsonb,
+    (SELECT data FROM v_dns_server WHERE id = 42)
+)
+WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id = 42);
+-- Time: ~10.7ms for 100 rows (2.08× faster)
+```
+
+**Impact:** 46% throughput improvement (114 → 167 ops/sec)
+
+---
+
+## 📚 Documentation
+
+- **[Implementation Details](docs/implementation/IMPLEMENTATION_SUCCESS.md)** - Technical implementation and verification
+- **[Benchmark Results](docs/implementation/BENCHMARK_RESULTS.md)** - Complete performance analysis
+- **[pgrx Integration Notes](docs/implementation/PGRX_INTEGRATION_ISSUE.md)** - SQL generation troubleshooting
+- **[Development Guide](DEVELOPMENT.md)** - Building and testing
+- **[Changelog](CHANGELOG.md)** - Version history
+
+### Archived Documentation
+
+- [Phase Plans](docs/archive/phases/) - Implementation phase history
+- [POC Planning](docs/archive/) - Original POC documentation
 
 ---
 
 ## 🛠️ Requirements
 
-- **PostgreSQL**: 13 or later (tested on 13-17)
-- **OS**: Linux, macOS
-- **Compiler**: GCC 4.9+ or Clang 3.4+
-- **Build Tools**: make, PostgreSQL dev headers
+- **PostgreSQL**: 17 (tested with pgrx 0.12.8)
+- **Rust**: Stable toolchain
+- **pgrx**: 0.12.8
+- **OS**: Linux (tested), macOS (should work)
 
-### Installing Build Dependencies
+### Build Dependencies
 
 **Debian/Ubuntu:**
 ```bash
-sudo apt-get install postgresql-server-dev-17 build-essential
-```
-
-**RHEL/CentOS:**
-```bash
-sudo yum install postgresql17-devel gcc make
+sudo apt-get install postgresql-server-dev-17 build-essential libclang-dev
 ```
 
 **Arch Linux:**
 ```bash
-sudo pacman -S postgresql-libs base-devel
-```
-
----
-
-## 📖 API Reference
-
-### `jsonb_merge_shallow(target, source)`
-
-Merges top-level keys from `source` JSONB into `target` JSONB.
-
-**Parameters:**
-- `target` (jsonb) - Base JSONB object to merge into
-- `source` (jsonb) - JSONB object whose keys will be merged
-
-**Returns:**
-- `jsonb` - New JSONB object with merged keys
-
-**Behavior:**
-- Source keys **overwrite** target keys on conflicts
-- Returns `NULL` if either argument is `NULL`
-- Raises error if either argument is not a JSONB object (arrays/scalars rejected)
-- **Shallow merge**: Nested objects are replaced entirely, not recursively merged
-
-**Examples:**
-
-```sql
--- Basic merge
-SELECT jsonb_merge_shallow('{"a": 1}'::jsonb, '{"b": 2}'::jsonb);
--- → {"a": 1, "b": 2}
-
--- Overwrite on conflict
-SELECT jsonb_merge_shallow('{"a": 1, "b": 2}'::jsonb, '{"b": 99}'::jsonb);
--- → {"a": 1, "b": 99}
-
--- Shallow merge (nested object replaced)
-SELECT jsonb_merge_shallow(
-    '{"user": {"name": "John", "age": 30}}'::jsonb,
-    '{"user": {"email": "john@example.com"}}'::jsonb
-);
--- → {"user": {"email": "john@example.com"}}  (age lost!)
-```
-
-**Performance:**
-- Manual merge implementation using Rust HashMap operations
-- O(n + m) time complexity: n = target keys, m = source keys
-- Memory usage: Creates new JSONB with cloned keys/values from both objects
-- Prioritizes type safety and maintainability over raw performance
-- See [performance benchmarks](test/benchmark_comparison.sql) for detailed comparisons
-
-**Performance Characteristics:**
-- Small objects (10 keys): ~5-10ms per 10,000 merges
-- Medium objects (50 keys): ~50-100ms per 1,000 merges
-- Large objects (150 keys): ~50-150ms per 100 merges
-- For maximum performance on simple merges, consider native `||` operator (see "When to Use" below)
-
-**When to Use This Extension:**
-
-Use `jsonb_merge_shallow` when:
-- ✅ Building CQRS materialized views with incremental updates
-- ✅ You want explicit, readable merge operations (`jsonb_merge_shallow` vs `||`)
-- ✅ Type safety is important (errors on array/scalar merge, native `||` allows)
-- ✅ You'll use future features (`jsonb_merge_at_path` for nested merging)
-- ✅ Clear error messages matter (shows actual type received)
-
-Use native `||` operator when:
-- ✅ Maximum performance is critical (native C implementation)
-- ✅ You need to merge arrays or mixed types
-- ✅ You want minimal dependencies (built-in PostgreSQL)
-- ✅ Working with complex JSONB manipulations using built-in functions
-
-**Example Comparison:**
-```sql
--- Extension (type-safe, explicit, readable):
-UPDATE orders SET data = jsonb_merge_shallow(data, new_customer_data);
-
--- Native (faster, more flexible, built-in):
-UPDATE orders SET data = data || new_customer_data;
+sudo pacman -S postgresql-libs base-devel clang
 ```
 
 ---
 
 ## 🤝 Contributing
 
-This project is in alpha. We welcome **feedback and bug reports** but are not yet accepting code contributions.
+This project is in alpha. Feedback and bug reports welcome!
 
 **Found a bug?** Open an issue: https://github.com/fraiseql/jsonb_ivm/issues
-
-**Want a feature?** Open a discussion: https://github.com/fraiseql/jsonb_ivm/discussions
-
----
-
-## 📋 Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ---
 
@@ -256,15 +250,21 @@ Licensed under the PostgreSQL License. See [LICENSE](LICENSE) for details.
 
 ---
 
-## 🏗️ Development Philosophy
+## 🎯 Project Status
 
-This project follows a **quality-first, CI/CD-driven** development methodology:
+**POC Status:** ✅ **Validated and Complete**
 
-- ✅ **Tests before code** (TDD)
-- ✅ **Zero compiler warnings** enforced
-- ✅ **Automated quality gates** on every commit
-- ✅ **Multi-version PostgreSQL testing** (13-17)
-- ✅ **Incremental alpha releases** with clear scope
-- ✅ **Documentation-driven development**
+- All 3 core functions implemented and working
+- Performance validated (1.45× to 2.66× faster)
+- Comprehensive benchmarks and documentation
+- Ready for alpha release
 
-**Built with PostgreSQL ❤️  | Alpha Quality | Battle-tested with automated CI/CD**
+**Next Steps:**
+- Alpha release packaging
+- Additional PostgreSQL version support (13-16)
+- SIMD optimizations for large arrays
+- Batch update functions
+
+---
+
+**Built with PostgreSQL ❤️ and Rust 🦀 | Alpha Quality | Performance Validated**
