@@ -538,6 +538,136 @@ fn jsonb_merge_at_path(
     JsonB(target_value)
 }
 
+/// Smart JSONB patch for scalar (root-level) updates
+///
+/// Simplifies pg_tview implementations by providing a dedicated function for
+/// root-level shallow merges. This is the most common update pattern.
+///
+/// # Arguments
+///
+/// * `target` - Current JSONB document
+/// * `source` - JSONB object with fields to merge
+///
+/// # Returns
+///
+/// Updated JSONB with source fields merged at root level
+///
+/// # Examples
+///
+/// ```sql
+/// -- Simple scalar update
+/// SELECT jsonb_smart_patch_scalar(
+///     '{"id": 1, "name": "old", "count": 10}'::jsonb,
+///     '{"name": "new", "active": true}'::jsonb
+/// );
+/// -- Result: {"id": 1, "name": "new", "count": 10, "active": true}
+///
+/// -- pg_tview pattern usage
+/// UPDATE tv_company
+/// SET data = jsonb_smart_patch_scalar(data, NEW.data)
+/// WHERE pk_company = NEW.pk_company;
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_smart_patch_scalar(
+    target: JsonB,
+    source: JsonB,
+) -> JsonB {
+    jsonb_merge_shallow(Some(target), Some(source))
+        .expect("jsonb_merge_shallow should not return NULL with valid inputs")
+}
+
+/// Smart JSONB patch for nested object updates
+///
+/// Simplifies pg_tview implementations for nested reference updates.
+/// Merges source into a nested object at the specified path.
+///
+/// # Arguments
+///
+/// * `target` - Current JSONB document
+/// * `source` - JSONB object to merge
+/// * `path` - Path to nested object (e.g., ARRAY['user', 'company'])
+///
+/// # Returns
+///
+/// Updated JSONB with source merged at nested path
+///
+/// # Examples
+///
+/// ```sql
+/// -- Nested object update
+/// SELECT jsonb_smart_patch_nested(
+///     '{"id": 1, "user": {"name": "Alice", "company": {"name": "ACME", "city": "NYC"}}}'::jsonb,
+///     '{"name": "ACME Corp"}'::jsonb,
+///     ARRAY['user', 'company']
+/// );
+/// -- Result: {"id": 1, "user": {"name": "Alice", "company": {"name": "ACME Corp", "city": "NYC"}}}
+///
+/// -- pg_tview pattern usage (user references company)
+/// UPDATE tv_user
+/// SET data = jsonb_smart_patch_nested(data, NEW.data, ARRAY['company'])
+/// WHERE pk_user IN (SELECT pk_user FROM user_has_company WHERE fk_company = NEW.pk_company);
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_smart_patch_nested(
+    target: JsonB,
+    source: JsonB,
+    path: pgrx::Array<&str>,
+) -> JsonB {
+    jsonb_merge_at_path(target, source, path)
+}
+
+/// Smart JSONB patch for array element updates
+///
+/// Simplifies pg_tview implementations for array updates within JSONB documents.
+/// Updates a single array element by matching on an ID field.
+///
+/// # Arguments
+///
+/// * `target` - Current JSONB document containing the array
+/// * `source` - JSONB object to merge into matched element
+/// * `array_path` - Path to the array field (e.g., "posts")
+/// * `match_key` - Key to match on (e.g., "id")
+/// * `match_value` - Value to match (e.g., '42'::jsonb)
+///
+/// # Returns
+///
+/// Updated JSONB with array element modified
+///
+/// # Examples
+///
+/// ```sql
+/// -- Array element update
+/// SELECT jsonb_smart_patch_array(
+///     '{"posts": [{"id": 1, "title": "Old"}, {"id": 2, "title": "Post 2"}]}'::jsonb,
+///     '{"title": "New", "updated": true}'::jsonb,
+///     'posts',
+///     'id',
+///     '1'::jsonb
+/// );
+/// -- Result: {"posts": [{"id": 1, "title": "New", "updated": true}, {"id": 2, "title": "Post 2"}]}
+///
+/// -- pg_tview pattern usage (feed contains posts array)
+/// UPDATE tv_feed
+/// SET data = jsonb_smart_patch_array(
+///     data,
+///     NEW.data,
+///     'posts',
+///     'id',
+///     to_jsonb(NEW.pk_post)
+/// )
+/// WHERE data->'posts' @> jsonb_build_array(jsonb_build_object('id', NEW.pk_post));
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_smart_patch_array(
+    target: JsonB,
+    source: JsonB,
+    array_path: &str,
+    match_key: &str,
+    match_value: JsonB,
+) -> JsonB {
+    jsonb_array_update_where(target, array_path, match_key, match_value, source)
+}
+
 /// Helper function to get human-readable type name for error messages
 fn value_type_name(value: &Value) -> &'static str {
     match value {
