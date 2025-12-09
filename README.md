@@ -455,19 +455,52 @@ FROM tv_feed;
 
 ## 🧪 Testing
 
-```bash
-# Run Rust test suite
-cargo pgrx test --release
+### Quick Start
 
-# Run performance benchmarks
-psql -d postgres -f test/benchmark_array_update_where.sql
+```bash
+# Install task runner (one-time)
+cargo install just
+
+# Run all tests
+just test
+
+# Development workflow
+just check      # Fast: formatting + clippy
+just fix        # Auto-fix issues
+just dev        # Fix + build
 ```
 
-Test coverage:
-- ✅ All 3 functions with edge cases
-- ✅ NULL handling (strict attribute)
-- ✅ Type validation
-- ✅ Performance benchmarks vs native SQL
+### Manual Testing
+
+**Rust Unit Tests** (requires pgrx):
+```bash
+cargo pgrx test pg17
+```
+
+**SQL Integration Tests**:
+```bash
+cargo pgrx install --release
+psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
+psql -d test_jsonb_ivm -f test/sql/01_basic_operations.sql
+```
+
+### Why not `cargo test`?
+
+pgrx extensions are PostgreSQL plugins, not standalone programs. They require PostgreSQL runtime symbols (PG_exception_stack, CurrentMemoryContext, etc.) which aren't available during standard Rust linking.
+
+**Use `cargo pgrx test`** instead, which:
+- Initializes a test PostgreSQL instance
+- Loads the extension as a dynamic library
+- Runs tests inside the PostgreSQL runtime (like production)
+
+For CI, we use SQL integration tests across PostgreSQL 13-17.
+
+### Test Coverage
+
+- ✅ **30+ Rust unit tests**: All functions, edge cases, NULL handling, type validation
+- ✅ **5 SQL test suites**: Production-like usage patterns
+- ✅ **Multi-version**: PostgreSQL 13-17 (Ubuntu + macOS)
+- ✅ **Performance benchmarks**: Validated 2-3× speedup vs native SQL
 
 ---
 
