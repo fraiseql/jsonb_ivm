@@ -11,13 +11,24 @@ env:
 
 jobs:
   test:
-    name: PostgreSQL ${{ matrix.pg-version }}
-    runs-on: ubuntu-latest
+    name: PostgreSQL ${{ matrix.pg-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         pg-version: [13, 14, 15, 16, 17]
+        os: [ubuntu-latest, macos-latest]
+        exclude:
+          # macOS testing is expensive, only test latest PG
+          - os: macos-latest
+            pg-version: 13
+          - os: macos-latest
+            pg-version: 14
+          - os: macos-latest
+            pg-version: 15
+          - os: macos-latest
+            pg-version: 16
 
     steps:
       - name: Checkout code
@@ -41,10 +52,16 @@ jobs:
 
       - name: Install PostgreSQL ${{ matrix.pg-version }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            postgresql-${{ matrix.pg-version }} \
-            postgresql-server-dev-${{ matrix.pg-version }}
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              postgresql-${{ matrix.pg-version }} \
+              postgresql-server-dev-${{ matrix.pg-version }}
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install postgresql@${{ matrix.pg-version }}
+            brew services start postgresql@${{ matrix.pg-version }}
+            echo "/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin" >> $GITHUB_PATH
+          fi
 
       - name: Install cargo-pgrx
         run: |
@@ -52,7 +69,11 @@ jobs:
 
       - name: Initialize pgrx
         run: |
-          cargo pgrx init --pg${{ matrix.pg-version }}=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            cargo pgrx init --pg${{ matrix.pg-version }}=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cargo pgrx init --pg${{ matrix.pg-version }}=/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin/pg_config
+          fi
 
       - name: Build extension
         run: |
@@ -60,13 +81,23 @@ jobs:
 
       - name: Install extension
         run: |
-          cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cargo pgrx install --pg-config=/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin/pg_config --release
+          fi
 
       - name: Run SQL integration tests
         run: |
-          sudo systemctl start postgresql@${{ matrix.pg-version }}-main || true
-          sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
-          sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo systemctl start postgresql@${{ matrix.pg-version }}-main || true
+            sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
+            sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            # macOS PostgreSQL is already started via brew services
+            psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
+            psql -c "CREATE DATABASE test_jsonb_ivm;"
+          fi
 
           # Create extension
           sudo -u postgres psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
@@ -74,7 +105,11 @@ jobs:
           # Run all test files
           for test_file in test/sql/*.sql; do
             echo "Running $test_file..."
-            sudo -u postgres psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+            if [ "$RUNNER_OS" == "Linux" ]; then
+              sudo -u postgres psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+            elif [ "$RUNNER_OS" == "macOS" ]; then
+              psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+            fi
 
             if [ $? -ne 0 ]; then
               echo "❌ FAILED: $test_file"
@@ -87,7 +122,11 @@ jobs:
 
           # Run v0.3.0 smoke tests
           echo "Running v0.3.0 smoke tests..."
-          sudo -u postgres psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo -u postgres psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+          fi
 
           if [ $? -ne 0 ]; then
             echo "❌ FAILED: v0.3.0 smoke tests"
