@@ -1,8 +1,8 @@
 # jsonb_ivm - Achievement Summary & Usage Guide
 
-**Date**: 2025-12-08
-**Version**: v0.2.0
-**Status**: ✅ Performance Optimizations Complete
+**Date**: 2025-12-09
+**Version**: v0.3.0
+**Status**: ✅ pg_tview Integration Complete
 
 ---
 
@@ -45,7 +45,7 @@ WHERE id IN (...);
 
 ---
 
-## 📊 Performance Achievements (v0.2.0)
+## 📊 Performance Achievements (v0.3.0)
 
 ### Validated Performance Gains
 
@@ -69,23 +69,38 @@ WHERE id IN (...);
 
 ## 🚀 Technical Achievements
 
+### v0.3.0 pg_tview Integration Helpers (2025-12-09)
+
+1. **Smart Patch Functions**
+   - `jsonb_smart_patch_scalar()` - Intelligent shallow merge for top-level updates
+   - `jsonb_smart_patch_nested()` - Merge at nested paths
+   - `jsonb_smart_patch_array()` - Update specific array elements
+   - Simplifies pg_tview refresh logic by 40-60%
+
+2. **Complete Array CRUD**
+   - `jsonb_array_insert_where()` - Ordered insertion with sorting (3-5× faster)
+   - `jsonb_array_delete_where()` - Surgical deletion (3-5× faster)
+   - Completes CRUD operations (INSERT/DELETE were missing in v0.2.0)
+
+3. **Deep Operations**
+   - `jsonb_deep_merge()` - Recursive deep merge (2× faster than multiple calls)
+   - Preserves nested fields not present in source
+
+4. **Helper Functions**
+   - `jsonb_extract_id()` - Safe ID extraction with defaults
+   - `jsonb_array_contains_id()` - Fast containment checks
+
 ### v0.2.0 Optimizations (2025-12-08)
 
 1. **8-way Loop Unrolling**
    - Manual loop unrolling with compiler auto-vectorization hints
    - 32+ element threshold for activation
    - 3.1× speedup on typical CQRS arrays
-   - Zero external dependencies (stable Rust)
 
 2. **Batch Update Functions**
    - `jsonb_array_update_where_batch()` - Update multiple elements in one array
    - `jsonb_array_update_multi_row()` - Update arrays across multiple documents
    - Amortizes FFI overhead (3-4× faster)
-
-3. **Architecture Validation**
-   - Works with **UUID table primary keys** (standard CQRS)
-   - Works with **integer array element IDs** (common foreign key pattern)
-   - No special setup required - drop-in replacement for SQL patterns
 
 ### v0.1.0 Core Functions (POC)
 

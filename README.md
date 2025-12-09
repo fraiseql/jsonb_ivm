@@ -351,6 +351,97 @@ Merges top-level keys from source into target (shallow merge).
 
 ---
 
+## ⚠️ NULL Handling & Error Behavior
+
+### NULL Parameter Handling
+
+Most functions are marked `STRICT` (returns NULL if any parameter is NULL):
+
+```sql
+-- Returns NULL (not an error)
+SELECT jsonb_smart_patch_scalar(NULL, '{"name": "test"}'::jsonb);  -- NULL
+SELECT jsonb_smart_patch_scalar('{"a": 1}'::jsonb, NULL);          -- NULL
+```
+
+**Exception:** `jsonb_array_insert_where()` allows NULL for `sort_key` and `sort_order` parameters:
+
+```sql
+-- Valid: unsorted insertion
+SELECT jsonb_array_insert_where(data, 'posts', new_post, NULL, NULL);
+```
+
+### Missing Paths/Keys
+
+Functions return the **original JSONB unchanged** when paths/keys don't exist:
+
+```sql
+-- Path doesn't exist → returns original unchanged
+SELECT jsonb_array_delete_where(
+    '{"other": "data"}'::jsonb,
+    'posts',  -- doesn't exist in document
+    'id',
+    '42'::jsonb
+);
+-- Result: {"other": "data"} (unchanged)
+
+-- Match value not found → returns original unchanged
+SELECT jsonb_smart_patch_array(
+    '{"posts": [{"id": 1}]}'::jsonb,
+    '{"title": "New"}'::jsonb,
+    'posts',
+    'id',
+    '99'::jsonb  -- element with id=99 doesn't exist
+);
+-- Result: {"posts": [{"id": 1}]} (unchanged)
+```
+
+### Type Mismatches
+
+Functions gracefully handle type mismatches by returning the original JSONB:
+
+```sql
+-- Array path points to non-array → returns original
+SELECT jsonb_array_update_where(
+    '{"posts": "not an array"}'::jsonb,
+    'posts',
+    'id',
+    '1'::jsonb,
+    '{}'::jsonb
+);
+-- Result: {"posts": "not an array"} (unchanged, no error)
+```
+
+### Best Practices
+
+```sql
+-- 1. Check if operation succeeded (compare result)
+UPDATE tv_feed
+SET data = jsonb_array_delete_where(data, 'posts', 'id', '42'::jsonb)
+WHERE jsonb_array_contains_id(data, 'posts', 'id', '42'::jsonb);
+-- Only updates rows that actually contain the element
+
+-- 2. Handle NULL parameters explicitly
+SELECT COALESCE(
+    jsonb_smart_patch_scalar(data, updates),
+    data  -- fallback if function returns NULL
+) FROM tv_company;
+
+-- 3. Validate JSONB structure before calling
+SELECT
+    CASE
+        WHEN jsonb_typeof(data->'posts') = 'array'
+        THEN jsonb_array_update_where(data, 'posts', 'id', id_val, updates)
+        ELSE data  -- return unchanged if not an array
+    END
+FROM tv_feed;
+```
+
+**For more details**, see:
+- [Troubleshooting Guide](docs/troubleshooting.md) - Common issues and solutions
+- [Integration Examples](docs/pg-tview-integration-examples.md) - Error handling patterns
+
+---
+
 ## 🧪 Testing
 
 ```bash
@@ -410,12 +501,12 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 
 ## 📚 Documentation
 
-- **[pg_tview Integration Examples](docs/PG_TVIEW_INTEGRATION_EXAMPLES.md)** - Real-world CRUD workflows (NEW v0.3.0)
-- **[Implementation Details](docs/implementation/IMPLEMENTATION_SUCCESS.md)** - Technical implementation and verification
-- **[Benchmark Results](docs/implementation/BENCHMARK_RESULTS.md)** - Complete performance analysis
-- **[pgrx Integration Notes](docs/implementation/PGRX_INTEGRATION_ISSUE.md)** - SQL generation troubleshooting
-- **[Development Guide](DEVELOPMENT.md)** - Building and testing
-- **[Changelog](CHANGELOG.md)** - Version history
+- **[pg_tview Integration Examples](docs/pg-tview-integration-examples.md)** - Real-world CRUD workflows (NEW v0.3.0)
+- **[Implementation Details](docs/implementation/implementation-success.md)** - Technical implementation and verification
+- **[Benchmark Results](docs/implementation/benchmark-results.md)** - Complete performance analysis
+- **[pgrx Integration Notes](docs/implementation/pgrx-integration-issue.md)** - SQL generation troubleshooting
+- **[Development Guide](development.md)** - Building and testing
+- **[Changelog](changelog.md)** - Version history
 
 ### Archived Documentation
 
@@ -426,10 +517,26 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 
 ## 🛠️ Requirements
 
-- **PostgreSQL**: 17 (tested with pgrx 0.12.8)
-- **Rust**: Stable toolchain
+### PostgreSQL Compatibility
+
+| PostgreSQL Version | Status | Notes |
+|--------------------|--------|-------|
+| 17 | ✅ **Fully Tested** | Recommended version |
+| 16 | ✅ **Supported** | Should work (built with `pg16` feature) |
+| 15 | ✅ **Supported** | Should work (built with `pg15` feature) |
+| 14 | ✅ **Supported** | Should work (built with `pg14` feature) |
+| 13 | ✅ **Supported** | Should work (built with `pg13` feature) |
+| 12 | ⚠️ **Experimental** | Untested, may work (built with `pg12` feature) |
+| 11 and earlier | ❌ **Not Supported** | pgrx does not support these versions |
+
+**Note:** While the extension supports PostgreSQL 13-17 via feature flags, only PostgreSQL 17 is actively tested in CI/CD. Other versions should work but haven't been validated.
+
+### System Requirements
+
+- **Rust**: 1.70+ (stable toolchain recommended)
 - **pgrx**: 0.12.8
-- **OS**: Linux (tested), macOS (should work)
+- **OS**: Linux (tested), macOS (should work), Windows (untested)
+- **Disk Space**: ~100MB for build artifacts
 
 ### Build Dependencies
 
@@ -443,13 +550,34 @@ sudo apt-get install postgresql-server-dev-17 build-essential libclang-dev
 sudo pacman -S postgresql-libs base-devel clang
 ```
 
+**macOS:**
+```bash
+brew install postgresql@17 llvm
+```
+
+### Building for Different PostgreSQL Versions
+
+```bash
+# PostgreSQL 17 (default)
+cargo pgrx install --release
+
+# PostgreSQL 16
+cargo pgrx install --release --pg-config /usr/lib/postgresql/16/bin/pg_config
+
+# Or set in Cargo.toml:
+# default = ["pg16"]
+```
+
 ---
 
 ## 🤝 Contributing
 
-This project is in alpha. Feedback and bug reports welcome!
+This project is in alpha. Contributions, feedback, and bug reports are welcome!
 
-**Found a bug?** Open an issue: https://github.com/fraiseql/jsonb_ivm/issues
+- **Contributing Guide**: See [contributing.md](contributing.md) for development setup, code style, and PR guidelines
+- **Bug Reports**: Open an issue at https://github.com/fraiseql/jsonb_ivm/issues
+- **Questions**: Use [GitHub Discussions](https://github.com/fraiseql/jsonb_ivm/discussions)
+- **Troubleshooting**: See [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ---
 
