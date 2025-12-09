@@ -114,3 +114,14 @@ jobs:
         with:
           use-quiet-mode: 'yes'
           config-file: '.github/markdown-link-check-config.json'
+
+  markdown-lint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v14
+        with:
+          globs: '**/*.md'

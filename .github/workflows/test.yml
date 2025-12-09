@@ -97,6 +97,20 @@ jobs:
             echo "✅ PASSED: v0.3.0 smoke tests"
           fi
 
+      - name: Validate SQL schema generation
+        run: |
+          # Generate schema and compare with committed version
+          cargo pgrx schema > /tmp/generated-schema.sql
+
+          # Check if schema matches committed version
+          if ! diff -u sql/jsonb_ivm--0.3.0.sql /tmp/generated-schema.sql; then
+            echo "❌ Generated schema doesn't match committed version!"
+            echo "Run: cargo pgrx schema > sql/jsonb_ivm--0.3.0.sql"
+            exit 1
+          fi
+
+          echo "✅ Schema generation validated"
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
