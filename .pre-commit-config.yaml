@@ -1,3 +1,6 @@
+ci:
+  skip: [cargo-fmt, cargo-clippy]
+
 repos:
   # Rust formatting and linting
   - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             postgresql-${{ matrix.pg-version }} \
-            postgresql-server-dev-${{ matrix.pg-version }}
+            postgresql-server-dev-${{ matrix.pg-version }} libreadline-dev
 
       - name: Install cargo-pgrx
         run: |

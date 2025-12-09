@@ -40,7 +40,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             postgresql-17 \
-            postgresql-server-dev-17
+            postgresql-server-dev-17 libreadline-dev
 
       - name: Install cargo-pgrx
         run: cargo install --locked cargo-pgrx --version 0.13.1
