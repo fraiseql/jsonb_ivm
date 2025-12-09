@@ -129,11 +129,20 @@ jobs:
             psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
           fi
 
+          # Copy test files to accessible location for postgres user
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo mkdir -p /tmp/test_files
+            sudo cp -r test/sql /tmp/test_files/
+            sudo cp test/smoke_test_v0.3.0.sql /tmp/test_files/
+            sudo chown -R postgres:postgres /tmp/test_files
+          fi
+
           # Run all test files
           for test_file in test/sql/*.sql; do
             echo "Running $test_file..."
             if [ "$RUNNER_OS" == "Linux" ]; then
-              sudo -u postgres /usr/lib/postgresql/${{ matrix.pg-version }}/bin/psql -h localhost -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+              test_basename=$(basename "$test_file")
+              sudo -u postgres /usr/lib/postgresql/${{ matrix.pg-version }}/bin/psql -h localhost -d test_jsonb_ivm -f "/tmp/test_files/sql/$test_basename" > "test_output_$test_basename.txt" 2>&1
             elif [ "$RUNNER_OS" == "macOS" ]; then
               psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
             fi
@@ -150,7 +159,7 @@ jobs:
           # Run v0.3.0 smoke tests
           echo "Running v0.3.0 smoke tests..."
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo -u postgres /usr/lib/postgresql/${{ matrix.pg-version }}/bin/psql -h localhost -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+            sudo -u postgres /usr/lib/postgresql/${{ matrix.pg-version }}/bin/psql -h localhost -d test_jsonb_ivm -f /tmp/test_files/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
           elif [ "$RUNNER_OS" == "macOS" ]; then
             psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
           fi
@@ -165,6 +174,9 @@ jobs:
 
       - name: Validate SQL schema generation
         run: |
+          # Fix ownership of target directory (may have been created by sudo install)
+          sudo chown -R $USER:$USER target/ || true
+
           # Generate schema and compare with committed version
           cargo pgrx schema --no-default-features --features "pg${{ matrix.pg-version }}" > /tmp/generated-schema.sql
 
