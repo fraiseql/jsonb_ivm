@@ -31,7 +31,7 @@ pg17 = ["pgrx/pg17"]
 pg_test = []
 
 [dev-dependencies]
-pgrx-tests = "0.12.8"
+pgrx-tests = "0.16.1"
 
 [profile.release]
 opt-level = 3
