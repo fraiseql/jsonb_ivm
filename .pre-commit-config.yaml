@@ -1,0 +1,41 @@
+ci:
+  skip: [cargo-fmt, cargo-clippy]
+
+repos:
+  # Rust formatting and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: ^sql/jsonb_ivm--.*\.sql$  # pgrx-generated schema must preserve exact format
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+        files: \.(c|cpp|cxx|cc|h|hpp|hxx)$
+
+  # Rust-specific hooks (using local system commands)
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Format Rust code with cargo fmt
+        entry: cargo fmt --
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        types: [file]
+
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Run cargo clippy
+        entry: cargo clippy --all-targets -- -D warnings
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        types: [file]
