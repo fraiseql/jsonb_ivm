@@ -49,8 +49,8 @@ fn find_by_int_id_optimized(array: &[Value], match_key: &str, match_value: i64) 
     }
 
     // Handle remainder elements
-    for (i, _) in array.iter().enumerate().skip(chunks * UNROLL) {
-        if let Some(v) = array[i].get(match_key) {
+    for (i, elem) in array.iter().enumerate().skip(chunks * UNROLL) {
+        if let Some(v) = elem.get(match_key) {
             if v.as_i64() == Some(match_value) {
                 return Some(i);
             }
@@ -121,7 +121,7 @@ fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<J
     // Perform shallow merge: clone target, then merge source keys
     let mut merged = target_obj.clone();
 
-    for (key, value) in source_obj.iter() {
+    for (key, value) in source_obj {
         merged.insert(key.clone(), value.clone());
     }
 
@@ -160,6 +160,7 @@ fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<J
 /// - Performs shallow merge on matched element
 /// - O(n) complexity where n = array length
 /// - For nested paths, use `jsonb_set` with `jsonb_array_update_where`
+#[allow(clippy::needless_pass_by_value)]
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_update_where(
     target: JsonB,
@@ -196,20 +197,13 @@ fn jsonb_array_update_where(
         );
     };
 
-    // Optimized fast path for integer IDs
-    let match_idx = match_val.as_i64().map_or_else(
-        || {
-            array_items
-                .iter()
-                .position(|elem| elem.get(match_key).is_some_and(|v| v == &match_val))
-        },
-        |int_id| find_by_int_id_optimized(array_items, match_key, int_id),
-    );
+    // Find matching element using optimized search
+    let match_idx = find_element_by_match(array_items, match_key, &match_val);
 
     // Apply update if match found
     if let Some(idx) = match_idx {
         if let Some(elem_obj) = array_items[idx].as_object_mut() {
-            for (key, value) in updates_obj.iter() {
+            for (key, value) in updates_obj {
                 elem_obj.insert(key.clone(), value.clone());
             }
         }
@@ -243,6 +237,7 @@ fn jsonb_array_update_where(
 /// - Amortizes array scan overhead
 /// - Single pass for multiple updates
 /// - 2-5× faster than N separate function calls
+#[allow(clippy::needless_pass_by_value)]
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_update_where_batch(
     target: JsonB,
@@ -293,7 +288,7 @@ fn jsonb_array_update_where_batch(
             if let Some(elem_id) = elem_obj.get(match_key).and_then(serde_json::Value::as_i64) {
                 if let Some(updates_obj) = update_map.get(&elem_id) {
                     // Apply updates
-                    for (key, value) in updates_obj.iter() {
+                    for (key, value) in *updates_obj {
                         elem_obj.insert(key.clone(), value.clone());
                     }
                 }
@@ -347,6 +342,8 @@ fn jsonb_array_update_where_batch(
 /// FROM updated
 /// WHERE tv_network_configuration.id = updated.rn;
 /// ```
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::needless_collect)]
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_update_multi_row(
     targets: pgrx::Array<JsonB>,
@@ -402,6 +399,7 @@ fn jsonb_array_update_multi_row(
 /// );
 /// -- Returns: {"id": 1, "network_configuration": {"id": 17, "name": "updated"}}
 /// ```
+#[allow(clippy::needless_pass_by_value)]
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) -> JsonB {
     // No Option unwrapping needed - strict guarantees non-NULL
@@ -456,8 +454,8 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
 
             // Get existing value at key (or create empty object)
             let target_at_path = parent_obj
-                .entry(key.to_string())
-                .or_insert_with(|| Value::Object(Default::default()));
+                .entry(key.clone())
+                .or_insert_with(|| Value::Object(serde_json::Map::default()));
 
             // Merge source into target at path
             let Some(merge_target) = target_at_path.as_object_mut() else {
@@ -483,8 +481,8 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
             };
 
             current = obj
-                .entry(key.to_string())
-                .or_insert_with(|| Value::Object(Default::default()));
+                .entry(key.clone())
+                .or_insert_with(|| Value::Object(serde_json::Map::default()));
         }
     }
 
@@ -686,20 +684,9 @@ fn jsonb_array_delete_where(
 
     let match_val = match_value.0;
 
-    // Find and remove matching element
-    if let Some(int_id) = match_val.as_i64() {
-        // Optimized path for integer IDs (use existing helper)
-        if let Some(idx) = find_by_int_id_optimized(array_items, match_key, int_id) {
-            array_items.remove(idx);
-        }
-    } else {
-        // Generic path for non-integer matches
-        if let Some(idx) = array_items
-            .iter()
-            .position(|elem| elem.get(match_key).is_some_and(|v| v == &match_val))
-        {
-            array_items.remove(idx);
-        }
+    // Find and remove matching element using optimized search
+    if let Some(idx) = find_element_by_match(array_items, match_key, &match_val) {
+        array_items.remove(idx);
     }
 
     JsonB(target_value)
@@ -845,11 +832,17 @@ fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering;
 
     match (a, b) {
-        // Numbers
+        // Numbers - try exact integer comparison first for precision
         (Value::Number(a_num), Value::Number(b_num)) => {
-            let a_f64 = a_num.as_f64().unwrap_or(0.0);
-            let b_f64 = b_num.as_f64().unwrap_or(0.0);
-            a_f64.partial_cmp(&b_f64).unwrap_or(Ordering::Equal)
+            match (a_num.as_i64(), b_num.as_i64()) {
+                (Some(a_int), Some(b_int)) => a_int.cmp(&b_int),
+                _ => {
+                    // Fall back to float comparison for non-integers
+                    let a_f64 = a_num.as_f64().unwrap_or(0.0);
+                    let b_f64 = b_num.as_f64().unwrap_or(0.0);
+                    a_f64.partial_cmp(&b_f64).unwrap_or(Ordering::Equal)
+                }
+            }
         }
         // Strings (includes timestamps)
         (Value::String(a_str), Value::String(b_str)) => a_str.cmp(b_str),
@@ -934,23 +927,32 @@ fn jsonb_deep_merge(target: JsonB, source: JsonB) -> JsonB {
 ///
 /// If both are objects, recursively merge their keys.
 /// Otherwise, source value replaces target value.
-fn deep_merge_recursive(mut target: Value, source: Value) -> Value {
-    // If both are objects, merge recursively
-    if let (Some(target_obj), Some(source_obj)) = (target.as_object_mut(), source.as_object()) {
-        for (key, source_value) in source_obj {
-            target_obj
-                .entry(key.clone())
-                .and_modify(|target_value| {
-                    // Recursively merge if both are objects
-                    *target_value =
-                        deep_merge_recursive(target_value.clone(), source_value.clone());
-                })
-                .or_insert_with(|| source_value.clone());
+fn deep_merge_recursive(target: Value, source: Value) -> Value {
+    match (target, source) {
+        (Value::Object(mut target_obj), Value::Object(source_obj)) => {
+            use serde_json::map::Entry;
+            for (key, source_value) in source_obj {
+                match target_obj.entry(key) {
+                    Entry::Occupied(mut e) => {
+                        let target_value = e.get_mut();
+                        if target_value.is_object() && source_value.is_object() {
+                            // Recursively merge, taking ownership to avoid clone
+                            *target_value =
+                                deep_merge_recursive(std::mem::take(target_value), source_value);
+                        } else {
+                            // Replace with source
+                            *target_value = source_value;
+                        }
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(source_value);
+                    }
+                }
+            }
+            Value::Object(target_obj)
         }
-        target
-    } else {
         // If not both objects, source wins (replaces target)
-        source
+        (_, source) => source,
     }
 }
 
@@ -1004,6 +1006,7 @@ fn deep_merge_recursive(mut target: Value, source: Value) -> Value {
 /// FROM tv_user
 /// WHERE jsonb_extract_id(data, 'company_id') = '123';
 /// ```
+#[allow(clippy::needless_pass_by_value)]
 #[pg_extern(immutable, parallel_safe)]
 fn jsonb_extract_id(data: JsonB, key: default!(&str, "'id'")) -> Option<String> {
     let obj = data.0.as_object()?;
@@ -1080,6 +1083,7 @@ fn jsonb_extract_id(data: JsonB, key: default!(&str, "'id'")) -> Option<String> 
 /// SELECT pk_feed FROM tv_feed
 /// WHERE jsonb_array_contains_id(data, 'posts', 'id', '123'::jsonb);
 /// ```
+#[allow(clippy::needless_pass_by_value)]
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_contains_id(data: JsonB, array_path: &str, id_key: &str, id_value: JsonB) -> bool {
     let Some(obj) = data.0.as_object() else {
@@ -1090,15 +1094,8 @@ fn jsonb_array_contains_id(data: JsonB, array_path: &str, id_key: &str, id_value
         return false;
     };
 
-    // Use optimized search if ID is integer
-    id_value.0.as_i64().map_or_else(
-        || {
-            array
-                .iter()
-                .any(|elem| elem.get(id_key).is_some_and(|v| v == &id_value.0))
-        },
-        |int_id| find_by_int_id_optimized(array, id_key, int_id).is_some(),
-    )
+    // Use optimized search helper
+    find_element_by_match(array, id_key, &id_value.0).is_some()
 }
 
 /// Helper function to get human-readable type name for error messages
@@ -1111,6 +1108,19 @@ const fn value_type_name(value: &Value) -> &'static str {
         Value::Array(_) => "array",
         Value::Object(_) => "object",
     }
+}
+
+/// Find element in array by key-value match with integer optimization
+#[inline]
+fn find_element_by_match(array: &[Value], match_key: &str, match_value: &Value) -> Option<usize> {
+    match_value.as_i64().map_or_else(
+        || {
+            array
+                .iter()
+                .position(|elem| elem.get(match_key).is_some_and(|v| v == match_value))
+        },
+        |int_id| find_by_int_id_optimized(array, match_key, int_id),
+    )
 }
 
 // ===== TESTS =====

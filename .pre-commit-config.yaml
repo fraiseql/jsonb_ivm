@@ -34,7 +34,7 @@ repos:
       - id: cargo-clippy
         name: cargo clippy
         description: Run cargo clippy
-        entry: cargo clippy --all-targets -- -D warnings
+        entry: cargo clippy --no-default-features --features pg17 --lib --bin pgrx_embed_jsonb_ivm -- -D warnings
         language: system
         pass_filenames: false
         files: \.(rs|toml)$

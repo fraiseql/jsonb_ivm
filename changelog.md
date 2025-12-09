@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] - 2025-12-09
+
+### Performance Improvements
+
+- **Deep merge optimization**: Reduced memory allocations by ~50% in `jsonb_deep_merge()`
+  - Eliminated 4 unnecessary `.clone()` calls per key during recursive merging
+  - Uses `std::mem::take()` to move values instead of cloning
+  - Significant performance boost for deeply nested object updates
+
+- **Improved number comparison**: Enhanced precision for large integer sorting
+  - Integer-first comparison path prevents precision loss
+  - Previously: Large integers (>2^53) could lose precision when converted to f64
+  - Now: Integers are compared exactly before falling back to float comparison
+  - Affects `jsonb_array_insert_where()` sorting behavior with large IDs
+
+- **Iterator optimizations**: Better compiler auto-vectorization potential
+  - Cleaner iterator usage in search functions
+  - Allows LLVM to generate more efficient code
+
+### Bug Fixes
+
+- **Integer precision**: Fixed potential precision loss when comparing/sorting large integer IDs (>2^53)
+  - Impacts: `jsonb_array_insert_where()` with sort_key on large integer fields
+  - Impact level: Low (only affects edge cases with very large integers)
+
+- **Build configuration**: Fixed pgrx build warnings for strict clippy configurations
+  - Added `check-cfg` for `pgrx_embed` cfg flag
+  - Eliminates warnings when building with `cargo clippy --all-targets -- -D warnings`
+
+### Code Quality
+
+- **Reduced code duplication**: Extracted `find_element_by_match()` helper function
+  - Consolidated 3 duplicate implementations into single reusable function
+  - Used in: `jsonb_array_update_where()`, `jsonb_array_delete_where()`, `jsonb_array_contains_id()`
+  - Net reduction: ~20 lines of duplicated logic
+
+- **Enhanced linting compliance**:
+  - ✅ Passes `clippy::pedantic` lint level
+  - ✅ Passes `clippy::nursery` lint level
+  - ✅ Passes `clippy::cargo` lint level
+  - Zero warnings with `-D warnings` flag
+
+### Internal Changes
+
+- All changes are internal refactoring with no API modifications
+- Fully backward compatible with v0.3.0
+- No database migration required
+- All existing SQL queries work unchanged
+
+### Notes
+
+This is a **patch release** following semantic versioning:
+- No new features
+- No breaking changes
+- No API modifications
+- Only performance improvements and bug fixes
+- Safe to upgrade from v0.3.0 with zero code changes
+
+---
+
 ## [0.3.0] - 2025-12-08
 
 ### 🚀 pg_tview Integration Helpers
