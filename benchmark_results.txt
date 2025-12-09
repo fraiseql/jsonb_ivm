@@ -36,7 +36,7 @@ Time: 0.990 ms
 Test 1.1: Scalar update (company name change)
 BEGIN
 Time: 0.113 ms
-                                                            QUERY PLAN                                                             
+                                                            QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------
  Update on tv_company  (cost=0.15..8.17 rows=0 width=0) (actual time=0.076..0.077 rows=0 loops=1)
    ->  Index Scan using tv_company_pkey on tv_company  (cost=0.15..8.17 rows=1 width=38) (actual time=0.066..0.067 rows=1 loops=1)
@@ -51,7 +51,7 @@ Time: 0.048 ms
 Test 1.2: Nested object update (company in user)
 BEGIN
 Time: 0.028 ms
-                                                             QUERY PLAN                                                              
+                                                             QUERY PLAN
 -------------------------------------------------------------------------------------------------------------------------------------
  Update on tv_user  (cost=8.17..28.30 rows=0 width=0) (actual time=1.096..1.096 rows=0 loops=1)
    InitPlan 1
@@ -81,7 +81,7 @@ Time: 0.035 ms
 Test 2.1a: DELETE via re-aggregation (BASELINE)
 BEGIN
 Time: 0.022 ms
-                                                            QUERY PLAN                                                             
+                                                            QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------
  Update on tv_feed  (cost=470.62..478.64 rows=0 width=0) (actual time=9.810..9.811 rows=0 loops=1)
    InitPlan 1
@@ -118,7 +118,7 @@ INSERT 0 1
 Time: 0.169 ms
 INSERT 0 1
 Time: 0.267 ms
-                                                             QUERY PLAN                                                             
+                                                             QUERY PLAN
 ------------------------------------------------------------------------------------------------------------------------------------
  Update on tv_feed  (cost=458.75..466.77 rows=0 width=0) (actual time=8.667..8.668 rows=0 loops=1)
    InitPlan 1
@@ -144,7 +144,7 @@ INSERT 0 1
 Time: 0.063 ms
 INSERT 0 1
 Time: 0.157 ms
-                                                          QUERY PLAN                                                           
+                                                          QUERY PLAN
 -------------------------------------------------------------------------------------------------------------------------------
  Update on tv_feed  (cost=8.45..16.47 rows=0 width=0) (actual time=1.977..1.977 rows=0 loops=1)
    InitPlan 1
@@ -164,7 +164,7 @@ Time: 0.035 ms
 Test 3.1a: Shallow merge (baseline)
 BEGIN
 Time: 0.022 ms
- before_name | before_industry 
+ before_name | before_industry
 -------------+-----------------
  ACME Corp   | Tech
 (1 row)
@@ -172,7 +172,7 @@ Time: 0.022 ms
 Time: 0.134 ms
 UPDATE 1
 Time: 0.139 ms
-  after_name  | after_industry_lost | after_headquarters 
+  after_name  | after_industry_lost | after_headquarters
 --------------+---------------------+--------------------
  Updated Name |                     | NYC
 (1 row)
@@ -183,7 +183,7 @@ Time: 0.026 ms
 Test 3.1b: Deep merge (preserves nested fields)
 BEGIN
 Time: 0.021 ms
- before_name | before_industry 
+ before_name | before_industry
 -------------+-----------------
  ACME Corp   | Tech
 (1 row)
@@ -191,7 +191,7 @@ Time: 0.021 ms
 Time: 0.059 ms
 UPDATE 1
 Time: 0.120 ms
-  after_name  | after_industry_preserved | after_headquarters 
+  after_name  | after_industry_preserved | after_headquarters
 --------------+--------------------------+--------------------
  Updated Name | Tech                     | NYC
 (1 row)
@@ -202,7 +202,7 @@ Time: 0.024 ms
 
 ===== BENCHMARK 4: Helper Functions =====
 Test 4.1: jsonb_extract_id
-                                                 QUERY PLAN                                                  
+                                                 QUERY PLAN
 -------------------------------------------------------------------------------------------------------------
  Limit  (cost=0.00..20.12 rows=810 width=32) (actual time=0.016..0.527 rows=100 loops=1)
    ->  Seq Scan on tv_user  (cost=0.00..20.12 rows=810 width=32) (actual time=0.015..0.524 rows=100 loops=1)
@@ -230,19 +230,19 @@ Time: 16.730 ms
 COMMIT
 Time: 0.875 ms
 Verifying cascade results:
-      step       |        value         
+      step       |        value
 -----------------+----------------------
  Company updated | ACME Corporation LLC
 (1 row)
 
 Time: 0.094 ms
-         step         |        value         
+         step         |        value
 ----------------------+----------------------
  User company updated | ACME Corporation LLC
 (1 row)
 
 Time: 0.065 ms
-            step             |        value         
+            step             |        value
 -----------------------------+----------------------
  Post author company updated | ACME Corporation LLC
 (1 row)

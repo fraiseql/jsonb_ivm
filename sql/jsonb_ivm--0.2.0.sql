@@ -218,4 +218,3 @@ IMMUTABLE STRICT PARALLEL SAFE
 LANGUAGE c /* Rust */
 AS 'MODULE_PATHNAME', 'jsonb_smart_patch_scalar_wrapper';
 /* </end connected objects> */
-
