@@ -1,0 +1,53 @@
+repos:
+  # Rust formatting and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+        files: \.(c|cpp|cxx|cc|h|hpp|hxx)$
+
+  # Rust-specific hooks
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: cargo fmt
+        description: Format Rust code with cargo fmt
+        entry: cargo fmt --
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+
+      - id: clippy
+        name: cargo clippy
+        description: Run cargo clippy
+        entry: cargo clippy --all-targets --all-features -- -D warnings
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+
+  # SQL formatting (if needed)
+  - repo: https://github.com/sqlfluff/pre-commit-hooks
+    rev: v1.2.0
+    hooks:
+      - id: sqlfluff-lint
+        files: \.(sql)$
+        exclude: ^sql/jsonb_ivm--.*\.sql$
+        args: [--dialect=postgres]
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+      - id: markdownlint
+        files: \.(md)$
+        exclude: ^docs/archive/

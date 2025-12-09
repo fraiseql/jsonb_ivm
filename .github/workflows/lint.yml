@@ -40,106 +40,106 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-           key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
 
-       - name: Install PostgreSQL dev headers
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y postgresql-server-dev-17
+      - name: Install PostgreSQL dev headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-server-dev-17
 
-       - name: Install cargo-pgrx
-         run: cargo install --locked cargo-pgrx --version 0.12.8
+      - name: Install cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.12.8
 
-       - name: Initialize pgrx
-         run: cargo pgrx init
+      - name: Initialize pgrx
+        run: cargo pgrx init
 
-       - name: Run Clippy
-         run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
-   clippy-strict:
-     name: Rust Clippy (Strict)
-     runs-on: ubuntu-latest
-     steps:
-       - uses: actions/checkout@v4
+  clippy-strict:
+    name: Rust Clippy (Strict)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
 
-       - uses: dtolnay/rust-toolchain@stable
-         with:
-           components: clippy
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
 
-       - name: Cache dependencies
-         uses: actions/cache@v4
-         with:
-           path: |
-             ~/.cargo/registry
-             ~/.cargo/git
-             target
-           key: ${{ runner.os }}-cargo-clippy-strict-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
 
-       - name: Install PostgreSQL dev headers
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y postgresql-server-dev-17
+    - name: Install PostgreSQL dev headers
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-server-dev-17
 
-       - name: Install cargo-pgrx
-         run: cargo install --locked cargo-pgrx --version 0.12.8
+    - name: Install cargo-pgrx
+      run: cargo install --locked cargo-pgrx --version 0.12.8
 
-       - name: Initialize pgrx
-         run: cargo pgrx init
+    - name: Initialize pgrx
+      run: cargo pgrx init
 
-       - name: Run Clippy (strict mode)
-         run: |
-           cargo clippy --all-targets --all-features -- \
-             -W clippy::all \
-             -W clippy::pedantic \
-             -W clippy::nursery \
-             -D warnings
+    - name: Run Clippy (strict mode)
+      run: |
+        cargo clippy --all-targets --all-features -- \
+          -W clippy::all \
+          -W clippy::pedantic \
+          -W clippy::nursery \
+          -D warnings
 
-   security:
+  security:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
 
-      - name: Run security audit
-        run: cargo audit
+    - name: Run security audit
+      run: cargo audit
 
   docs:
     name: Documentation Build
     runs-on: ubuntu-latest
     steps:
-       - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-       - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
 
-       - name: Cache dependencies
-         uses: actions/cache@v4
-         with:
-           path: |
-             ~/.cargo/registry
-             ~/.cargo/git
-             target
-           key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
 
-       - name: Install PostgreSQL dev headers
-         run: |
-           sudo apt-get update
-           sudo apt-get install -y postgresql-server-dev-17
+    - name: Install PostgreSQL dev headers
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-server-dev-17
 
-       - name: Install cargo-pgrx
-         run: cargo install --locked cargo-pgrx --version 0.12.8
+    - name: Install cargo-pgrx
+      run: cargo install --locked cargo-pgrx --version 0.12.8
 
-       - name: Initialize pgrx
-         run: cargo pgrx init
+    - name: Initialize pgrx
+      run: cargo pgrx init
 
-       - name: Build documentation
-         run: cargo doc --no-deps --all-features
-         env:
-           RUSTDOCFLAGS: -D warnings
+    - name: Build documentation
+      run: cargo doc --no-deps --all-features
+      env:
+        RUSTDOCFLAGS: -D warnings
 
   markdown-links:
     name: Markdown Link Check
