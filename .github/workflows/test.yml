@@ -158,7 +158,7 @@ jobs:
 
       - name: Upload to Codecov
         if: matrix.pg-version == 17 && matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage/cobertura.xml
 
