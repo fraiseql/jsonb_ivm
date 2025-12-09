@@ -58,7 +58,7 @@ jobs:
         run: cargo pgrx init
 
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --no-default-features --features pg17 -- -D warnings
 
   clippy-strict:
     name: Rust Clippy (Strict)
@@ -96,7 +96,7 @@ jobs:
 
     - name: Run Clippy (strict mode)
       run: |
-        cargo clippy --all-targets --all-features -- \
+        cargo clippy --all-targets --no-default-features --features pg17 -- \
           -W clippy::all \
           -W clippy::pedantic \
           -W clippy::nursery \
@@ -149,7 +149,7 @@ jobs:
       run: cargo pgrx init
 
     - name: Build documentation
-      run: cargo doc --no-deps --all-features
+      run: cargo doc --no-deps --no-default-features --features pg17
       env:
         RUSTDOCFLAGS: -D warnings
 
