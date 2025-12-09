@@ -113,7 +113,7 @@ See [benchmarks](docs/implementation/BENCHMARK_RESULTS.md) for details.
 
 ### v0.3.0 Functions
 
-#### `jsonb_smart_patch_scalar(target, source)` ⭐ NEW
+### `jsonb_smart_patch_scalar(target, source)` ⭐ NEW
 
 Intelligent shallow merge for top-level object updates.
 
@@ -124,7 +124,7 @@ SET data = jsonb_smart_patch_scalar(data, '{"name": "ACME Corp"}'::jsonb)
 WHERE pk = 1;
 ```
 
-#### `jsonb_smart_patch_nested(target, source, path)` ⭐ NEW
+### `jsonb_smart_patch_nested(target, source, path)` ⭐ NEW
 
 Merge JSONB at a nested path within the document.
 
@@ -139,7 +139,7 @@ SET data = jsonb_smart_patch_nested(
 WHERE fk_company = 1;
 ```
 
-#### `jsonb_smart_patch_array(target, source, array_path, match_key, match_value)` ⭐ NEW
+### `jsonb_smart_patch_array(target, source, array_path, match_key, match_value)` ⭐ NEW
 
 Update a specific element within a JSONB array.
 
@@ -156,7 +156,7 @@ SET data = jsonb_smart_patch_array(
 WHERE pk = 1;
 ```
 
-#### `jsonb_array_delete_where(target, array_path, match_key, match_value)` ⭐ NEW
+### `jsonb_array_delete_where(target, array_path, match_key, match_value)` ⭐ NEW
 
 Surgically delete an element from a JSONB array.
 
@@ -174,7 +174,7 @@ SET data = jsonb_array_delete_where(
 WHERE pk = 1;
 ```
 
-#### `jsonb_array_insert_where(target, array_path, new_element, sort_key, sort_order)` ⭐ NEW
+### `jsonb_array_insert_where(target, array_path, new_element, sort_key, sort_order)` ⭐ NEW
 
 Insert an element into a JSONB array with optional sorting.
 
@@ -193,7 +193,7 @@ SET data = jsonb_array_insert_where(
 WHERE pk = 1;
 ```
 
-#### `jsonb_deep_merge(target, source)` ⭐ NEW
+### `jsonb_deep_merge(target, source)` ⭐ NEW
 
 Recursively merge nested JSONB objects, preserving fields not present in source.
 
@@ -207,7 +207,7 @@ SELECT jsonb_deep_merge(
 -- Note: "c" is preserved, unlike shallow merge which would lose it
 ```
 
-#### `jsonb_extract_id(data, key)` ⭐ NEW
+### `jsonb_extract_id(data, key)` ⭐ NEW
 
 Safely extract an ID field from JSONB as text.
 
@@ -220,7 +220,7 @@ SELECT jsonb_extract_id('{"id": "abc-123", "name": "test"}'::jsonb);
 -- Result: "abc-123"
 ```
 
-#### `jsonb_array_contains_id(data, array_path, id_key, id_value)` ⭐ NEW
+### `jsonb_array_contains_id(data, array_path, id_key, id_value)` ⭐ NEW
 
 Fast check if a JSONB array contains an element with a specific ID.
 

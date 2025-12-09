@@ -144,11 +144,10 @@ jobs:
           echo "Documented in README: $README_FUNCTIONS"
 
           if [ "$RUST_FUNCTIONS" -ne "$README_FUNCTIONS" ]; then
-            echo "⚠️  Warning: Not all functions are documented!"
+            echo "❌ ERROR: Not all functions are documented!"
             echo "Found $RUST_FUNCTIONS functions in code but only $README_FUNCTIONS documented in README.md"
             echo "Please update README.md API reference"
-            # Don't fail for now - just warn
-            # exit 1
+            exit 1
           else
             echo "✅ All functions documented"
           fi
