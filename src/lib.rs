@@ -23,13 +23,13 @@ pgrx::pg_module_magic!();
 /// generate SIMD instructions automatically (auto-vectorization)
 #[inline]
 fn find_by_int_id_optimized(array: &[Value], match_key: &str, match_value: i64) -> Option<usize> {
+    // Unroll loop by 8 for potential auto-vectorization
+    const UNROLL: usize = 8;
+
     // For small arrays, simple iteration is fastest
     if array.len() < 32 {
         return find_by_int_id_scalar(array, match_key, match_value);
     }
-
-    // Unroll loop by 8 for potential auto-vectorization
-    const UNROLL: usize = 8;
     let chunks = array.len() / UNROLL;
 
     for chunk_idx in 0..chunks {
@@ -49,7 +49,7 @@ fn find_by_int_id_optimized(array: &[Value], match_key: &str, match_value: i64) 
     }
 
     // Handle remainder elements
-    for i in (chunks * UNROLL)..array.len() {
+    for (i, _) in array.iter().enumerate().skip(chunks * UNROLL) {
         if let Some(v) = array[i].get(match_key) {
             if v.as_i64() == Some(match_value) {
                 return Some(i);
@@ -63,9 +63,9 @@ fn find_by_int_id_optimized(array: &[Value], match_key: &str, match_value: i64) 
 /// Scalar fallback for small arrays or non-integer IDs
 #[inline]
 fn find_by_int_id_scalar(array: &[Value], match_key: &str, match_value: i64) -> Option<usize> {
-    array
-        .iter()
-        .position(|elem| elem.get(match_key).and_then(|v| v.as_i64()) == Some(match_value))
+    array.iter().position(|elem| {
+        elem.get(match_key).and_then(serde_json::Value::as_i64) == Some(match_value)
+    })
 }
 
 // ===== CORE FUNCTIONS =====
@@ -104,24 +104,18 @@ fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<J
     let source_value = source.0;
 
     // Validate that both are JSON objects (not arrays or scalars)
-    let target_obj = match target_value.as_object() {
-        Some(obj) => obj,
-        None => {
-            error!(
-                "target argument must be a JSONB object, got: {}",
-                value_type_name(&target_value)
-            );
-        }
+    let Some(target_obj) = target_value.as_object() else {
+        error!(
+            "target argument must be a JSONB object, got: {}",
+            value_type_name(&target_value)
+        );
     };
 
-    let source_obj = match source_value.as_object() {
-        Some(obj) => obj,
-        None => {
-            error!(
-                "source argument must be a JSONB object, got: {}",
-                value_type_name(&source_value)
-            );
-        }
+    let Some(source_obj) = source_value.as_object() else {
+        error!(
+            "source argument must be a JSONB object, got: {}",
+            value_type_name(&source_value)
+        );
     };
 
     // Perform shallow merge: clone target, then merge source keys
@@ -139,7 +133,7 @@ fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<J
 ///
 /// # Arguments
 /// * `target` - JSONB document containing the array
-/// * `array_path` - Path to the array within the document (e.g., "dns_servers")
+/// * `array_path` - Path to the array within the document (e.g., `"dns_servers"`)
 /// * `match_key` - Key to match on (e.g., "id")
 /// * `match_value` - Value to match (e.g., 42)
 /// * `updates` - JSONB object to merge into matched element
@@ -165,7 +159,7 @@ fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Option<J
 /// - If no match found, returns document unchanged
 /// - Performs shallow merge on matched element
 /// - O(n) complexity where n = array length
-/// - For nested paths, use jsonb_set with jsonb_array_update_where
+/// - For nested paths, use `jsonb_set` with `jsonb_array_update_where`
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_update_where(
     target: JsonB,
@@ -178,50 +172,39 @@ fn jsonb_array_update_where(
     let mut target_value: Value = target.0;
 
     // Navigate to array location (single level for now)
-    let array = match target_value.get_mut(array_path) {
-        Some(arr) => arr,
-        None => {
-            error!("Path '{}' does not exist in document", array_path);
-        }
+    let Some(array) = target_value.get_mut(array_path) else {
+        error!("Path '{}' does not exist in document", array_path);
     };
 
     // Validate it's an array
-    let array_items = match array.as_array_mut() {
-        Some(arr) => arr,
-        None => {
-            error!(
-                "Path '{}' does not point to an array, found: {}",
-                array_path,
-                value_type_name(array)
-            );
-        }
+    let Some(array_items) = array.as_array_mut() else {
+        error!(
+            "Path '{}' does not point to an array, found: {}",
+            array_path,
+            value_type_name(array)
+        );
     };
 
     // Extract match value as serde_json::Value
     let match_val = match_value.0;
 
     // Validate updates is an object
-    let updates_obj = match updates.0.as_object() {
-        Some(obj) => obj,
-        None => {
-            error!(
-                "updates argument must be a JSONB object, got: {}",
-                value_type_name(&updates.0)
-            );
-        }
+    let Some(updates_obj) = updates.0.as_object() else {
+        error!(
+            "updates argument must be a JSONB object, got: {}",
+            value_type_name(&updates.0)
+        );
     };
 
     // Optimized fast path for integer IDs
-    let match_idx = if let Some(int_id) = match_val.as_i64() {
-        find_by_int_id_optimized(array_items, match_key, int_id)
-    } else {
-        // Fallback to scalar search for non-integer matches
-        array_items.iter().position(|elem| {
-            elem.get(match_key)
-                .map(|v| v == &match_val)
-                .unwrap_or(false)
-        })
-    };
+    let match_idx = match_val.as_i64().map_or_else(
+        || {
+            array_items
+                .iter()
+                .position(|elem| elem.get(match_key).is_some_and(|v| v == &match_val))
+        },
+        |int_id| find_by_int_id_optimized(array_items, match_key, int_id),
+    );
 
     // Apply update if match found
     if let Some(idx) = match_idx {
@@ -239,9 +222,9 @@ fn jsonb_array_update_where(
 ///
 /// # Arguments
 /// * `target` - JSONB document containing the array
-/// * `array_path` - Path to the array (e.g., "dns_servers")
-/// * `match_key` - Key to match on (e.g., "id")
-/// * `updates_array` - Array of {match_value, updates} pairs
+/// * `array_path` - Path to the array (e.g., `"dns_servers"`)
+/// * `match_key` - Key to match on (e.g., `"id"`)
+/// * `updates_array` - Array of {`match_value`, updates} pairs
 ///
 /// # Example
 /// ```sql
@@ -269,19 +252,16 @@ fn jsonb_array_update_where_batch(
 ) -> JsonB {
     let mut target_value: Value = target.0;
 
-    let array = match target_value.get_mut(array_path) {
-        Some(arr) => arr,
-        None => error!("Path '{}' does not exist in document", array_path),
+    let Some(array) = target_value.get_mut(array_path) else {
+        error!("Path '{}' does not exist in document", array_path)
     };
 
-    let array_items = match array.as_array_mut() {
-        Some(arr) => arr,
-        None => error!("Path '{}' does not point to an array", array_path),
+    let Some(array_items) = array.as_array_mut() else {
+        error!("Path '{}' does not point to an array", array_path)
     };
 
-    let updates_list = match updates_array.0.as_array() {
-        Some(arr) => arr,
-        None => error!("updates_array must be a JSONB array"),
+    let Some(updates_list) = updates_array.0.as_array() else {
+        error!("updates_array must be a JSONB array")
     };
 
     // Build hashmap of updates for O(1) lookup
@@ -289,19 +269,19 @@ fn jsonb_array_update_where_batch(
         HashMap::with_capacity(updates_list.len());
 
     for update_spec in updates_list {
-        let spec_obj = match update_spec.as_object() {
-            Some(obj) => obj,
-            None => continue, // Skip malformed specs
+        let Some(spec_obj) = update_spec.as_object() else {
+            continue;
+        }; // Skip malformed specs
+
+        let Some(match_value) = spec_obj
+            .get("match_value")
+            .and_then(serde_json::Value::as_i64)
+        else {
+            continue;
         };
 
-        let match_value = match spec_obj.get("match_value").and_then(|v| v.as_i64()) {
-            Some(id) => id,
-            None => continue,
-        };
-
-        let updates_obj = match spec_obj.get("updates").and_then(|v| v.as_object()) {
-            Some(obj) => obj,
-            None => continue,
+        let Some(updates_obj) = spec_obj.get("updates").and_then(|v| v.as_object()) else {
+            continue;
         };
 
         update_map.insert(match_value, updates_obj);
@@ -310,7 +290,7 @@ fn jsonb_array_update_where_batch(
     // Single pass through array, apply all matching updates
     for element in array_items.iter_mut() {
         if let Some(elem_obj) = element.as_object_mut() {
-            if let Some(elem_id) = elem_obj.get(match_key).and_then(|v| v.as_i64()) {
+            if let Some(elem_id) = elem_obj.get(match_key).and_then(serde_json::Value::as_i64) {
                 if let Some(updates_obj) = update_map.get(&elem_id) {
                     // Apply updates
                     for (key, value) in updates_obj.iter() {
@@ -376,17 +356,17 @@ fn jsonb_array_update_multi_row(
     updates: JsonB,
 ) -> TableIterator<'static, (name!(result, JsonB),)> {
     let match_val = match_value.0;
-    let updates_obj = match updates.0.as_object() {
-        Some(obj) => obj.clone(),
-        None => error!("updates argument must be a JSONB object"),
+    let Some(updates_obj) = updates.0.as_object() else {
+        error!("updates argument must be a JSONB object")
     };
+    let updates_obj = updates_obj.clone();
 
     // Convert &str to owned String to satisfy 'static lifetime
     let array_path_owned = array_path.to_string();
     let match_key_owned = match_key.to_string();
 
     // Collect all targets into a Vec to own the data
-    let targets_vec: Vec<JsonB> = targets.iter().filter_map(|t| t).collect();
+    let targets_vec: Vec<JsonB> = targets.iter().flatten().collect();
 
     // Create iterator that will be returned as SETOF
     TableIterator::new(targets_vec.into_iter().map(move |target| {
@@ -428,33 +408,31 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
     let mut target_value: Value = target.0;
 
     // Validate source is an object
-    let source_obj = match source.0.as_object() {
-        Some(obj) => obj,
-        None => {
-            error!(
-                "source argument must be a JSONB object, got: {}",
-                value_type_name(&source.0)
-            );
-        }
+    let Some(source_obj) = source.0.as_object() else {
+        error!(
+            "source argument must be a JSONB object, got: {}",
+            value_type_name(&source.0)
+        );
     };
 
     // Collect path into owned Vec<String> to avoid lifetime issues
-    let path_vec: Vec<String> = path.iter().flatten().map(|s| s.to_owned()).collect();
+    let path_vec: Vec<String> = path
+        .iter()
+        .flatten()
+        .map(std::borrow::ToOwned::to_owned)
+        .collect();
 
     // If path is empty, merge at root
     if path_vec.is_empty() {
-        let target_obj = match target_value.as_object_mut() {
-            Some(obj) => obj,
-            None => {
-                error!(
-                    "target argument must be a JSONB object when path is empty, got: {}",
-                    value_type_name(&target_value)
-                );
-            }
+        let Some(target_obj) = target_value.as_object_mut() else {
+            error!(
+                "target argument must be a JSONB object when path is empty, got: {}",
+                value_type_name(&target_value)
+            );
         };
 
         // Shallow merge at root
-        for (key, value) in source_obj.iter() {
+        for (key, value) in source_obj {
             target_obj.insert(key.clone(), value.clone());
         }
 
@@ -468,15 +446,12 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
 
         if is_last {
             // At target location - merge here
-            let parent_obj = match current.as_object_mut() {
-                Some(obj) => obj,
-                None => {
-                    error!(
-                        "Path navigation failed: expected object at {:?}, got: {}",
-                        &path_vec[..i],
-                        value_type_name(current)
-                    );
-                }
+            let Some(parent_obj) = current.as_object_mut() else {
+                error!(
+                    "Path navigation failed: expected object at {:?}, got: {}",
+                    &path_vec[..i],
+                    value_type_name(current)
+                );
             };
 
             // Get existing value at key (or create empty object)
@@ -485,32 +460,26 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
                 .or_insert_with(|| Value::Object(Default::default()));
 
             // Merge source into target at path
-            let merge_target = match target_at_path.as_object_mut() {
-                Some(obj) => obj,
-                None => {
-                    error!(
-                        "Cannot merge into non-object at path {:?}, found: {}",
-                        path_vec,
-                        value_type_name(target_at_path)
-                    );
-                }
+            let Some(merge_target) = target_at_path.as_object_mut() else {
+                error!(
+                    "Cannot merge into non-object at path {:?}, found: {}",
+                    path_vec,
+                    value_type_name(target_at_path)
+                );
             };
 
-            for (key, value) in source_obj.iter() {
+            for (key, value) in source_obj {
                 merge_target.insert(key.clone(), value.clone());
             }
         } else {
             // Navigate deeper
             let current_type = value_type_name(current);
-            let obj = match current.as_object_mut() {
-                Some(obj) => obj,
-                None => {
-                    error!(
-                        "Path navigation failed at {:?}, expected object, got: {}",
-                        &path_vec[..=i],
-                        current_type
-                    );
-                }
+            let Some(obj) = current.as_object_mut() else {
+                error!(
+                    "Path navigation failed at {:?}, expected object, got: {}",
+                    &path_vec[..=i],
+                    current_type
+                );
             };
 
             current = obj
@@ -524,7 +493,7 @@ fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>) ->
 
 /// Smart JSONB patch for scalar (root-level) updates
 ///
-/// Simplifies pg_tview implementations by providing a dedicated function for
+/// Simplifies `pg_tview` implementations by providing a dedicated function for
 /// root-level shallow merges. This is the most common update pattern.
 ///
 /// # Arguments
@@ -559,7 +528,7 @@ fn jsonb_smart_patch_scalar(target: JsonB, source: JsonB) -> JsonB {
 
 /// Smart JSONB patch for nested object updates
 ///
-/// Simplifies pg_tview implementations for nested reference updates.
+/// Simplifies `pg_tview` implementations for nested reference updates.
 /// Merges source into a nested object at the specified path.
 ///
 /// # Arguments
@@ -595,16 +564,16 @@ fn jsonb_smart_patch_nested(target: JsonB, source: JsonB, path: pgrx::Array<&str
 
 /// Smart JSONB patch for array element updates
 ///
-/// Simplifies pg_tview implementations for array updates within JSONB documents.
+/// Simplifies `pg_tview` implementations for array updates within JSONB documents.
 /// Updates a single array element by matching on an ID field.
 ///
 /// # Arguments
 ///
 /// * `target` - Current JSONB document containing the array
 /// * `source` - JSONB object to merge into matched element
-/// * `array_path` - Path to the array field (e.g., "posts")
-/// * `match_key` - Key to match on (e.g., "id")
-/// * `match_value` - Value to match (e.g., '42'::jsonb)
+/// * `array_path` - Path to the array field (e.g., `"posts"`)
+/// * `match_key` - Key to match on (e.g., `"id"`)
+/// * `match_value` - Value to match (e.g., `'42'::jsonb`)
 ///
 /// # Returns
 ///
@@ -706,16 +675,14 @@ fn jsonb_array_delete_where(
     let mut target_value: Value = target.0;
 
     // Navigate to array location
-    let array = match target_value.get_mut(array_path) {
-        Some(arr) => arr,
-        None => return JsonB(target_value), // Array doesn't exist, return unchanged
-    };
+    let Some(array) = target_value.get_mut(array_path) else {
+        return JsonB(target_value);
+    }; // Array doesn't exist, return unchanged
 
     // Validate it's an array
-    let array_items = match array.as_array_mut() {
-        Some(arr) => arr,
-        None => return JsonB(target_value), // Not an array, return unchanged
-    };
+    let Some(array_items) = array.as_array_mut() else {
+        return JsonB(target_value);
+    }; // Not an array, return unchanged
 
     let match_val = match_value.0;
 
@@ -727,11 +694,10 @@ fn jsonb_array_delete_where(
         }
     } else {
         // Generic path for non-integer matches
-        if let Some(idx) = array_items.iter().position(|elem| {
-            elem.get(match_key)
-                .map(|v| v == &match_val)
-                .unwrap_or(false)
-        }) {
+        if let Some(idx) = array_items
+            .iter()
+            .position(|elem| elem.get(match_key).is_some_and(|v| v == &match_val))
+        {
             array_items.remove(idx);
         }
     }
@@ -742,14 +708,14 @@ fn jsonb_array_delete_where(
 /// Insert an element into a JSONB array with optional sort order maintenance
 ///
 /// Provides surgical insertion without re-aggregation. Can maintain sort order
-/// if sort_key is provided, or simply append to the end.
+/// if `sort_key` is provided, or simply append to the end.
 ///
 /// # Arguments
 ///
 /// * `target` - JSONB document containing (or to contain) the array
-/// * `array_path` - Path to the array (e.g., "posts")
+/// * `array_path` - Path to the array (e.g., `"posts"`)
 /// * `new_element` - Element to insert
-/// * `sort_key` - Optional key to maintain sort order (e.g., "created_at")
+/// * `sort_key` - Optional key to maintain sort order (e.g., `"created_at"`)
 /// * `sort_order` - Sort direction: "ASC" (default) or "DESC"
 ///
 /// # Returns
@@ -811,29 +777,23 @@ fn jsonb_array_insert_where(
     let new_elem = new_element.0;
 
     // Get or create array at path
-    let target_obj = match target_value.as_object_mut() {
-        Some(obj) => obj,
-        None => {
-            error!(
-                "target must be a JSONB object, got: {}",
-                value_type_name(&target_value)
-            );
-        }
+    let Some(target_obj) = target_value.as_object_mut() else {
+        error!(
+            "target must be a JSONB object, got: {}",
+            value_type_name(&target_value)
+        );
     };
 
     let array = target_obj
         .entry(array_path.to_string())
         .or_insert_with(|| Value::Array(vec![]));
 
-    let array_items = match array.as_array_mut() {
-        Some(arr) => arr,
-        None => {
-            error!(
-                "path '{}' must point to an array or not exist, got: {}",
-                array_path,
-                value_type_name(array)
-            );
-        }
+    let Some(array_items) = array.as_array_mut() else {
+        error!(
+            "path '{}' must point to an array or not exist, got: {}",
+            array_path,
+            value_type_name(array)
+        );
     };
 
     if let Some(key) = sort_key {
@@ -858,18 +818,16 @@ fn find_insertion_point(
     sort_key: &str,
     sort_order: &str,
 ) -> usize {
-    let new_val = match new_val {
-        Some(v) => v,
-        None => return array.len(), // No sort value, insert at end
-    };
+    let Some(new_val) = new_val else {
+        return array.len();
+    }; // No sort value, insert at end
 
     array
         .iter()
         .position(|elem| {
-            let elem_val = match elem.get(sort_key) {
-                Some(v) => v,
-                None => return false, // Element has no sort key, continue searching
-            };
+            let Some(elem_val) = elem.get(sort_key) else {
+                return false;
+            }; // Element has no sort key, continue searching
 
             // Compare values based on sort order
             if sort_order.eq_ignore_ascii_case("ASC") {
@@ -1000,7 +958,7 @@ fn deep_merge_recursive(mut target: Value, source: Value) -> Value {
 
 /// Extract ID value from JSONB document
 ///
-/// Simplifies ID extraction for pg_tview implementations by providing a safe,
+/// Simplifies ID extraction for `pg_tview` implementations by providing a safe,
 /// type-flexible ID extraction function.
 ///
 /// # Arguments
@@ -1060,7 +1018,7 @@ fn jsonb_extract_id(data: JsonB, key: default!(&str, "'id'")) -> Option<String> 
 
 /// Check if JSONB array contains element with specific ID
 ///
-/// Fast containment check for pg_tview implementations, with optimized
+/// Fast containment check for `pg_tview` implementations, with optimized
 /// search for integer IDs using loop unrolling.
 ///
 /// # Arguments
@@ -1124,29 +1082,27 @@ fn jsonb_extract_id(data: JsonB, key: default!(&str, "'id'")) -> Option<String> 
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
 fn jsonb_array_contains_id(data: JsonB, array_path: &str, id_key: &str, id_value: JsonB) -> bool {
-    let obj = match data.0.as_object() {
-        Some(o) => o,
-        None => return false,
+    let Some(obj) = data.0.as_object() else {
+        return false;
     };
 
-    let array = match obj.get(array_path).and_then(|v| v.as_array()) {
-        Some(arr) => arr,
-        None => return false,
+    let Some(array) = obj.get(array_path).and_then(|v| v.as_array()) else {
+        return false;
     };
 
     // Use optimized search if ID is integer
-    if let Some(int_id) = id_value.0.as_i64() {
-        find_by_int_id_optimized(array, id_key, int_id).is_some()
-    } else {
-        // Generic search for non-integer IDs
-        array
-            .iter()
-            .any(|elem| elem.get(id_key).map(|v| v == &id_value.0).unwrap_or(false))
-    }
+    id_value.0.as_i64().map_or_else(
+        || {
+            array
+                .iter()
+                .any(|elem| elem.get(id_key).is_some_and(|v| v == &id_value.0))
+        },
+        |int_id| find_by_int_id_optimized(array, id_key, int_id).is_some(),
+    )
 }
 
 /// Helper function to get human-readable type name for error messages
-fn value_type_name(value: &Value) -> &'static str {
+const fn value_type_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "boolean",
