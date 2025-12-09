@@ -234,6 +234,6 @@ See [README.md](README.md#contributing) for contribution guidelines.
 
 ## Links
 
-- **GitHub**: https://github.com/fraiseql/jsonb_ivm
-- **Issues**: https://github.com/fraiseql/jsonb_ivm/issues
-- **Discussions**: https://github.com/fraiseql/jsonb_ivm/discussions
+- **GitHub**: [Repository](https://github.com/fraiseql/jsonb_ivm)
+- **Issues**: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/fraiseql/jsonb_ivm/discussions)

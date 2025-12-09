@@ -545,7 +545,7 @@ ROLLBACK;
 
 If you're still stuck:
 
-1. **Search existing issues**: https://github.com/fraiseql/jsonb_ivm/issues
+1. **Search existing issues**: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
 2. **Check documentation**: See README.md, docs/PG_TVIEW_INTEGRATION_EXAMPLES.md
 3. **Open a new issue**: Provide:
    - jsonb_ivm version (`SELECT * FROM pg_extension WHERE extname = 'jsonb_ivm'`)
@@ -598,4 +598,4 @@ HINT:  No function matches the given name and argument types. You might need to 
 
 ---
 
-**Still having issues?** Open an issue: https://github.com/fraiseql/jsonb_ivm/issues
+**Still having issues?** Open an issue: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)

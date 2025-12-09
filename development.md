@@ -150,6 +150,6 @@ git push origin v0.1.0
 
 ## Getting Help
 
-- pgrx docs: https://github.com/pgcentralfoundation/pgrx
-- Project issues: https://github.com/fraiseql/jsonb_ivm/issues
-- PostgreSQL docs: https://www.postgresql.org/docs/
+- pgrx docs: [pgrx repository](https://github.com/pgcentralfoundation/pgrx)
+- Project issues: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
+- PostgreSQL docs: [PostgreSQL Documentation](https://www.postgresql.org/docs/)

@@ -456,7 +456,7 @@ After upgrading to v0.3.0:
 
 - **Troubleshooting**: See [docs/troubleshooting.md](docs/troubleshooting.md)
 - **Integration Examples**: See [docs/pg-tview-integration-examples.md](docs/pg-tview-integration-examples.md)
-- **Issues**: https://github.com/fraiseql/jsonb_ivm/issues
+- **Issues**: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
 
 ---
 

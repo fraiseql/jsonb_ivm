@@ -494,8 +494,8 @@ For performance-critical changes:
 ## Getting Help
 
 - **Documentation**: See readme.md and docs/
-- **Issues**: https://github.com/fraiseql/jsonb_ivm/issues
-- **Discussions**: https://github.com/fraiseql/jsonb_ivm/discussions
+- **Issues**: [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/fraiseql/jsonb_ivm/discussions)
 
 ---
 

@@ -116,7 +116,7 @@ WHERE id IN (...);
 
 ### Architecture Context
 
-**CQRS Pattern**:
+#### CQRS Pattern
 ```
 ┌─────────────────┐
 │  DNS Server     │ ← Leaf view (source of truth)
@@ -719,7 +719,7 @@ SELECT jsonb_array_update_where(
 
 **Perfect for**: CQRS architectures, microservices with JSONB projections, high-throughput systems
 
-**Repository**: https://github.com/fraiseql/jsonb_ivm
+**Repository**: [GitHub Repository](https://github.com/fraiseql/jsonb_ivm)
 **License**: PostgreSQL License
 **Author**: Lionel Hamayon (fraiseql)
 

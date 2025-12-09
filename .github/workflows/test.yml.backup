@@ -1,0 +1,107 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: PostgreSQL ${{ matrix.pg-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        pg-version: [13, 14, 15, 16, 17]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install PostgreSQL ${{ matrix.pg-version }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-${{ matrix.pg-version }} \
+            postgresql-server-dev-${{ matrix.pg-version }}
+
+      - name: Install cargo-pgrx
+        run: |
+          cargo install --locked cargo-pgrx --version 0.12.8
+
+      - name: Initialize pgrx
+        run: |
+          cargo pgrx init --pg${{ matrix.pg-version }}=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
+
+      - name: Build extension
+        run: |
+          cargo build --release --locked
+
+      - name: Install extension
+        run: |
+          cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release
+
+      - name: Run SQL integration tests
+         run: |
+           sudo systemctl start postgresql@${{ matrix.pg-version }}-main || true
+           sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
+           sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
+
+           # Create extension
+           sudo -u postgres psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
+
+           # Run all test files
+           for test_file in test/sql/*.sql; do
+             echo "Running $test_file..."
+             sudo -u postgres psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+
+             if [ $? -ne 0 ]; then
+               echo "❌ FAILED: $test_file"
+               cat "test_output_$(basename $test_file).txt"
+               exit 1
+             else
+               echo "✅ PASSED: $test_file"
+             fi
+           done
+
+           # Run v0.3.0 smoke tests
+           echo "Running v0.3.0 smoke tests..."
+           sudo -u postgres psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+
+           if [ $? -ne 0 ]; then
+             echo "❌ FAILED: v0.3.0 smoke tests"
+             cat test_output_smoke_v0.3.0.txt
+             exit 1
+           else
+             echo "✅ PASSED: v0.3.0 smoke tests"
+           fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-pg${{ matrix.pg-version }}
+          path: |
+            test_output_*.txt
+          if-no-files-found: ignore

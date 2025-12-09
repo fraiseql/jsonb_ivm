@@ -75,7 +75,7 @@ SELECT jsonb_merge_shallow(
 - ✅ **`jsonb_deep_merge()`** - Recursive deep merge (preserves nested fields)
 - ✅ **`jsonb_extract_id()` / `jsonb_array_contains_id()`** - Helper functions for pg_tview
 
-**Impact on pg_tview:**
+### Impact on pg_tview
 - Complete JSONB array CRUD support (INSERT/DELETE now available)
 - 40-60% code reduction in refresh logic
 - +10-20% cascade throughput improvement
@@ -464,9 +464,9 @@ Test coverage:
 
 ### CQRS Incremental View Maintenance
 
-**Scenario:** Update DNS server affecting 100 network configurations
+### Scenario: Update DNS server affecting 100 network configurations
 
-**Before (Native SQL):**
+#### Before (Native SQL)
 ```sql
 -- Re-aggregate entire array (slow!)
 UPDATE tv_network_configuration
@@ -480,7 +480,7 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 -- Time: ~22ms for 100 rows
 ```
 
-**After (Rust Extension):**
+#### After (Rust Extension)
 ```sql
 -- Surgical update (fast!)
 UPDATE tv_network_configuration
@@ -495,7 +495,7 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 -- Time: ~10.7ms for 100 rows (2.08× faster)
 ```
 
-**Impact:** 46% throughput improvement (114 → 167 ops/sec)
+#### Impact: 46% throughput improvement (114 → 167 ops/sec)
 
 ---
 
@@ -575,7 +575,7 @@ cargo pgrx install --release --pg-config /usr/lib/postgresql/16/bin/pg_config
 This project is in alpha. Contributions, feedback, and bug reports are welcome!
 
 - **Contributing Guide**: See [contributing.md](contributing.md) for development setup, code style, and PR guidelines
-- **Bug Reports**: Open an issue at https://github.com/fraiseql/jsonb_ivm/issues
+- **Bug Reports**: Open an issue at [GitHub Issues](https://github.com/fraiseql/jsonb_ivm/issues)
 - **Questions**: Use [GitHub Discussions](https://github.com/fraiseql/jsonb_ivm/discussions)
 - **Troubleshooting**: See [docs/troubleshooting.md](docs/troubleshooting.md)
 

@@ -370,10 +370,10 @@ fn deep_merge(target, source):
 
 ## References
 
-- **pgrx Documentation**: https://github.com/pgcentralfoundation/pgrx
-- **PostgreSQL JSONB Internals**: https://www.postgresql.org/docs/current/datatype-json.html
-- **CQRS Pattern**: https://martinfowler.com/bliki/CQRS.html
-- **Rust Book**: https://doc.rust-lang.org/book/
+- **pgrx Documentation**: [pgrx repository](https://github.com/pgcentralfoundation/pgrx)
+- **PostgreSQL JSONB Internals**: [PostgreSQL JSONB Documentation](https://www.postgresql.org/docs/current/datatype-json.html)
+- **CQRS Pattern**: [CQRS Pattern](https://martinfowler.com/bliki/CQRS.html)
+- **Rust Book**: [The Rust Programming Language](https://doc.rust-lang.org/book/)
 
 ---
 
