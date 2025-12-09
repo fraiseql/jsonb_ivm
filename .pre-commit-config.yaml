@@ -8,6 +8,7 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        exclude: ^sql/jsonb_ivm--.*\.sql$  # pgrx-generated schema must preserve exact format
       - id: check-yaml
       - id: check-added-large-files
 
