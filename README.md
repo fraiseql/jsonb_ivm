@@ -106,7 +106,7 @@ SELECT jsonb_merge_shallow(
 | Array-heavy cascade | 22.14 ms | **10.67 ms** | **2.08×** |
 | 100 cascades (stress) | 870 ms | **600 ms** | **1.45×** |
 
-See [benchmarks](docs/implementation/BENCHMARK_RESULTS.md) for details.
+See [benchmarks](docs/implementation/benchmark-results.md) for details.
 
 ---
 

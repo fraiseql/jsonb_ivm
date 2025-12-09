@@ -197,7 +197,7 @@ This release represents a complete rewrite from C to Rust using the pgrx framewo
 - Modern tooling (clippy, rustfmt, cargo-audit)
 - Foundation for future features (nested merge, change detection)
 
-See [comprehensive code review](CODE_REVIEW_PROMPT.md) for detailed quality assessment.
+See [comprehensive code review](code-review-prompt.md) for detailed quality assessment.
 
 ---
 

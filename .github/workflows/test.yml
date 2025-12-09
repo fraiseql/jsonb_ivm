@@ -63,6 +63,10 @@ jobs:
       - name: Install PostgreSQL ${{ matrix.pg-version }}
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
+            # Add PostgreSQL APT repository
+            sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+            wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+
             sudo apt-get update
             sudo apt-get install -y \
               postgresql-${{ matrix.pg-version }} \
@@ -70,19 +74,23 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install postgresql@${{ matrix.pg-version }}
             brew services start postgresql@${{ matrix.pg-version }}
-            echo "/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin" >> $GITHUB_PATH
+            # Use dynamic path detection for Apple Silicon and Intel compatibility
+            PG_BIN=$(brew --prefix postgresql@${{ matrix.pg-version }})/bin
+            echo "$PG_BIN" >> $GITHUB_PATH
           fi
 
       - name: Install cargo-pgrx
         run: |
-          cargo install --locked cargo-pgrx --version 0.12.8
+          cargo install --locked cargo-pgrx --version 0.13.1
 
       - name: Initialize pgrx
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
             cargo pgrx init --pg${{ matrix.pg-version }}=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            cargo pgrx init --pg${{ matrix.pg-version }}=/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin/pg_config
+            # Use dynamic path detection for Apple Silicon and Intel compatibility
+            PG_CONFIG=$(brew --prefix postgresql@${{ matrix.pg-version }})/bin/pg_config
+            cargo pgrx init --pg${{ matrix.pg-version }}=$PG_CONFIG
           fi
 
       - name: Build extension
