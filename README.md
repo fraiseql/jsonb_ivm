@@ -76,6 +76,7 @@ SELECT jsonb_merge_shallow(
 - ✅ **`jsonb_extract_id()` / `jsonb_array_contains_id()`** - Helper functions for pg_tview
 
 ### Impact on pg_tview
+
 - Complete JSONB array CRUD support (INSERT/DELETE now available)
 - 40-60% code reduction in refresh logic
 - +10-20% cascade throughput improvement
@@ -118,10 +119,11 @@ See [benchmarks](docs/implementation/BENCHMARK_RESULTS.md) for details.
 Intelligent shallow merge for top-level object updates.
 
 **Example:**
+
 ```sql
 UPDATE tv_company
 SET data = jsonb_smart_patch_scalar(data, '{"name": "ACME Corp"}'::jsonb)
-WHERE pk = 1;
+WHERE pk_company = 1;
 ```
 
 ### `jsonb_smart_patch_nested(target, source, path)` ⭐ NEW
@@ -129,6 +131,7 @@ WHERE pk = 1;
 Merge JSONB at a nested path within the document.
 
 **Example:**
+
 ```sql
 UPDATE tv_user
 SET data = jsonb_smart_patch_nested(
@@ -144,6 +147,7 @@ WHERE fk_company = 1;
 Update a specific element within a JSONB array.
 
 **Example:**
+
 ```sql
 UPDATE tv_feed
 SET data = jsonb_smart_patch_array(
@@ -153,7 +157,7 @@ SET data = jsonb_smart_patch_array(
     'id',
     '"abc-123"'::jsonb
 )
-WHERE pk = 1;
+WHERE pk_feed = 1;
 ```
 
 ### `jsonb_array_delete_where(target, array_path, match_key, match_value)` ⭐ NEW
@@ -163,6 +167,7 @@ Surgically delete an element from a JSONB array.
 **Performance:** 3-5× faster than re-aggregation.
 
 **Example:**
+
 ```sql
 UPDATE tv_feed
 SET data = jsonb_array_delete_where(
@@ -171,7 +176,7 @@ SET data = jsonb_array_delete_where(
     'id',
     '"post-to-delete"'::jsonb
 )
-WHERE pk = 1;
+WHERE pk_feed = 1;
 ```
 
 ### `jsonb_array_insert_where(target, array_path, new_element, sort_key, sort_order)` ⭐ NEW
@@ -181,6 +186,7 @@ Insert an element into a JSONB array with optional sorting.
 **Performance:** 3-5× faster than re-aggregation.
 
 **Example:**
+
 ```sql
 UPDATE tv_feed
 SET data = jsonb_array_insert_where(
@@ -190,7 +196,7 @@ SET data = jsonb_array_insert_where(
     'created_at',  -- sort by this key
     'DESC'         -- descending order
 )
-WHERE pk = 1;
+WHERE pk_feed = 1;
 ```
 
 ### `jsonb_deep_merge(target, source)` ⭐ NEW
@@ -198,6 +204,7 @@ WHERE pk = 1;
 Recursively merge nested JSONB objects, preserving fields not present in source.
 
 **Example:**
+
 ```sql
 SELECT jsonb_deep_merge(
     '{"a": 1, "b": {"c": 2, "d": 3}}'::jsonb,
@@ -215,6 +222,7 @@ Safely extract an ID field from JSONB as text.
 - `key` - defaults to `'id'`
 
 **Example:**
+
 ```sql
 SELECT jsonb_extract_id('{"id": "abc-123", "name": "test"}'::jsonb);
 -- Result: "abc-123"
@@ -225,6 +233,7 @@ SELECT jsonb_extract_id('{"id": "abc-123", "name": "test"}'::jsonb);
 Fast check if a JSONB array contains an element with a specific ID.
 
 **Example:**
+
 ```sql
 SELECT pk FROM tv_feed
 WHERE jsonb_array_contains_id(
@@ -269,6 +278,7 @@ Batch update multiple elements in a JSONB array in a single pass.
 **Returns:** Updated JSONB document
 
 **Example:**
+
 ```sql
 SELECT jsonb_array_update_where_batch(
     '{"dns_servers": [{"id": 1}, {"id": 2}, {"id": 3}]}'::jsonb,
@@ -299,6 +309,7 @@ Update arrays across multiple JSONB documents in one call.
 **Returns:** Array of updated JSONB documents (same order as input)
 
 **Example:**
+
 ```sql
 -- Update 100 network configurations in one call
 UPDATE tv_network_configuration
@@ -467,6 +478,7 @@ Test coverage:
 ### Scenario: Update DNS server affecting 100 network configurations
 
 #### Before (Native SQL)
+
 ```sql
 -- Re-aggregate entire array (slow!)
 UPDATE tv_network_configuration
@@ -481,6 +493,7 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 ```
 
 #### After (Rust Extension)
+
 ```sql
 -- Surgical update (fast!)
 UPDATE tv_network_configuration
@@ -541,16 +554,19 @@ WHERE id IN (SELECT network_configuration_id FROM mappings WHERE dns_server_id =
 ### Build Dependencies
 
 **Debian/Ubuntu:**
+
 ```bash
 sudo apt-get install postgresql-server-dev-17 build-essential libclang-dev
 ```
 
 **Arch Linux:**
+
 ```bash
 sudo pacman -S postgresql-libs base-devel clang
 ```
 
 **macOS:**
+
 ```bash
 brew install postgresql@17 llvm
 ```
@@ -603,7 +619,8 @@ Licensed under the PostgreSQL License. See [LICENSE](LICENSE) for details.
 - Comprehensive benchmarks and pg_tview integration examples
 - Ready for integration with pg_tview project
 
-**Next Steps:**
+### Next Steps
+
 - Integration with pg_tview (replace manual refresh logic)
 - Additional PostgreSQL version support (13-16)
 - Further SIMD optimizations
@@ -611,4 +628,4 @@ Licensed under the PostgreSQL License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Built with PostgreSQL ❤️ and Rust 🦀 | Alpha Quality | Performance Validated**
+Built with PostgreSQL ❤️ and Rust 🦀 | Alpha Quality | Performance Validated
