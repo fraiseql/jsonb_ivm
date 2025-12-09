@@ -154,15 +154,37 @@ jobs:
         if: matrix.pg-version == 17 && matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
         run: |
           cargo install cargo-tarpaulin
-          cargo tarpaulin --out Xml --output-dir ./coverage
+           cargo tarpaulin --out Xml --output-dir ./coverage
 
-      - name: Upload to Codecov
-        if: matrix.pg-version == 17 && matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage/cobertura.xml
+       - name: Upload to Codecov
+         if: matrix.pg-version == 17 && matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
+         uses: codecov/codecov-action@v3
+         with:
+           file: ./coverage/cobertura.xml
 
-      - name: Upload test results
+       - name: Check coverage threshold
+         if: matrix.pg-version == 17 && matrix.os == 'ubuntu-latest' && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
+         run: |
+           # Install jq for JSON parsing
+           sudo apt-get update && sudo apt-get install -y jq
+
+           # Generate JSON coverage report
+           cargo tarpaulin --out Json --output-dir ./coverage
+
+           # Extract coverage percentage
+           COVERAGE=$(jq -r '.coverage' ./coverage/coverage.json)
+
+           echo "Current coverage: ${COVERAGE}%"
+
+           # Check if coverage meets 80% threshold
+           if (( $(echo "${COVERAGE} < 80.0" | bc -l) )); then
+             echo "❌ ERROR: Code coverage ${COVERAGE}% is below 80% threshold"
+             exit 1
+           else
+             echo "✅ Code coverage ${COVERAGE}% meets 80% threshold"
+           fi
+
+       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
