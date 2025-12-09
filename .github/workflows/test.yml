@@ -101,7 +101,7 @@ jobs:
       - name: Install extension
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo env "PATH=$PATH" cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release --no-default-features --features "pg${{ matrix.pg-version }}"
+            sudo -E env "PATH=$PATH" $(which cargo) pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release --no-default-features --features "pg${{ matrix.pg-version }}"
           elif [ "$RUNNER_OS" == "macOS" ]; then
             PG_CONFIG=$(brew --prefix postgresql@${{ matrix.pg-version }})/bin/pg_config
             cargo pgrx install --pg-config=$PG_CONFIG --release --no-default-features --features "pg${{ matrix.pg-version }}"
