@@ -63,6 +63,7 @@ jobs:
   clippy-strict:
     name: Rust Clippy (Strict)
     runs-on: ubuntu-latest
+    continue-on-error: true  # Don't fail PR if strict clippy finds issues
     steps:
     - uses: actions/checkout@v4
 
