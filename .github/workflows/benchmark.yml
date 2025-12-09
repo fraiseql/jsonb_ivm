@@ -31,18 +31,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install PostgreSQL 17
+      - name: Install PostgreSQL 16
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            postgresql-17 \
-            postgresql-server-dev-17
+            postgresql-16 \
+            postgresql-server-dev-16
 
       - name: Install cargo-pgrx
         run: cargo install --locked cargo-pgrx --version 0.12.8
 
       - name: Initialize pgrx
-        run: cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config
+        run: cargo pgrx init --pg16=/usr/lib/postgresql/16/bin/pg_config
 
       - name: Build extension
         run: cargo build --release --locked
@@ -52,7 +52,7 @@ jobs:
 
       - name: Run benchmarks
         run: |
-          sudo systemctl start postgresql@17-main || true
+          sudo systemctl start postgresql@16-main || true
           sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
           sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
           sudo -u postgres psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
