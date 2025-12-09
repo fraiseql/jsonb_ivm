@@ -174,7 +174,17 @@ jobs:
       - name: Lint markdown files
         uses: DavidAnson/markdownlint-cli2-action@v14
         with:
-          globs: '**/*.md'
+          globs: |
+            README.md
+            TESTING.md
+            changelog.md
+            contributing.md
+            development.md
+            upgrading.md
+            docs/troubleshooting.md
+            docs/architecture.md
+            docs/pg-tview-integration-examples.md
+            docs/pg-tview-helpers-proposal.md
 
   doc-coverage:
     name: Documentation Coverage

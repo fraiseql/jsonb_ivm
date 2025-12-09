@@ -1,0 +1,11 @@
+# Markdownlint ignore file
+# Exclude planning and archive documents from linting
+
+.phases/**
+achievement-summary.md
+phase-4-summary.md
+documentation-structure.md
+code-review-prompt.md
+ci-cd-improvement-plan.md
+node_modules/**
+target/**

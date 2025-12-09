@@ -572,21 +572,25 @@ pub fn apply_patch(tv: &TView, pk: i64, new_data: JsonB, changed_fk: &str) -> Re
 ## 📋 Implementation Plan
 
 ### Phase 1: Core Helpers (Week 1)
+
 - [ ] `jsonb_smart_patch()` - Highest impact for pg_tview simplification
 - [ ] `jsonb_extract_id()` - Common pattern, easy win
 - [ ] `jsonb_array_contains_id()` - Propagation optimization
 
 ### Phase 2: Array Operations (Week 2)
+
 - [ ] `jsonb_array_delete_where()` - Complete CRUD operations
 - [ ] `jsonb_array_insert_where()` - Ordered insertions
 - [ ] Comprehensive tests for edge cases
 
 ### Phase 3: Deep Operations (Week 3)
+
 - [ ] `jsonb_deep_merge()` - Complex nested updates
 - [ ] Performance benchmarks
 - [ ] Documentation and examples
 
 ### Phase 4: Integration (Week 4)
+
 - [ ] Update pg_tview PRD to use new helpers
 - [ ] Example implementations in pg_tview
 - [ ] Integration tests

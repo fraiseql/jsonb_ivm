@@ -32,11 +32,13 @@ jsonb_ivm is a PostgreSQL extension written in Rust using the [pgrx](https://git
 ### Prerequisites
 
 - **Rust**: 1.70+ (stable toolchain)
+
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
 
 - **PostgreSQL**: 13-17 (development headers required)
+
   ```bash
   # Debian/Ubuntu
   sudo apt-get install postgresql-server-dev-17 build-essential libclang-dev
@@ -46,6 +48,7 @@ jsonb_ivm is a PostgreSQL extension written in Rust using the [pgrx](https://git
   ```
 
 - **cargo-pgrx**: 0.12.8
+
   ```bash
   cargo install --locked cargo-pgrx
   cargo pgrx init  # One-time setup
@@ -174,6 +177,7 @@ fn jsonb_array_update_where(
 **For new functions:**
 
 1. Add Rust unit tests in `src/lib.rs`:
+
    ```rust
    #[cfg(test)]
    mod tests {
@@ -187,6 +191,7 @@ fn jsonb_array_update_where(
    ```
 
 2. Add SQL integration tests in `test/sql/`:
+
    ```bash
    # Create new test file
    touch test/sql/07_my_feature.sql
@@ -208,6 +213,7 @@ We aim for:
 ### Before Submitting
 
 1. **Run all checks:**
+
    ```bash
    cargo fmt
    cargo clippy -- -D warnings
@@ -273,7 +279,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Format
 
-```
+```text
 <type>(<scope>): <description>
 
 [optional body]
@@ -330,28 +336,26 @@ docs(readme): add NULL handling section to API reference
 ### Bug Report Template
 
 ```markdown
-**Describe the bug**
+Describe the bug:
 Clear description of what's wrong
 
-**To Reproduce**
-```sql
--- Minimal SQL example that reproduces the issue
+To Reproduce:
+-- SQL example
 SELECT jsonb_array_update_where(...);
-```
 
-**Expected behavior**
+Expected behavior:
 What you expected to happen
 
-**Actual behavior**
+Actual behavior:
 What actually happened
 
-**Environment**
+Environment:
 - jsonb_ivm version: v0.3.0
 - PostgreSQL version: 17.2
 - OS: Ubuntu 24.04
 - Rust version: 1.83.0
 
-**Additional context**
+Additional context:
 Any other relevant information
 ```
 
@@ -362,25 +366,23 @@ Any other relevant information
 ### Enhancement Template
 
 ```markdown
-**Feature Description**
+Feature Description:
 Clear description of the proposed feature
 
-**Motivation**
+Motivation:
 Why is this feature needed? What problem does it solve?
 
-**Proposed API**
-```sql
--- Example SQL syntax
+Proposed API:
+-- SQL example
 SELECT new_function(...);
-```
 
-**Use Case**
+Use Case:
 Real-world scenario where this would be useful
 
-**Performance Considerations**
+Performance Considerations:
 Expected performance characteristics
 
-**Alternatives Considered**
+Alternatives Considered:
 What other approaches did you consider?
 ```
 
@@ -479,7 +481,7 @@ For performance-critical changes:
 
 ## Release Process
 
-*For maintainers only*
+> **Note**: For maintainers only
 
 1. Update version in `Cargo.toml`
 2. Update version in `jsonb_ivm.control`
@@ -525,4 +527,6 @@ Violations will result in temporary or permanent bans.
 
 ---
 
-**Thank you for contributing to jsonb_ivm! 🚀**
+## Thank You
+
+Thank you for contributing to jsonb_ivm!

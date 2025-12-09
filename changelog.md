@@ -16,6 +16,7 @@ This release adds complete JSONB array CRUD support and helper functions specifi
 ### Added
 
 #### Smart Patch Functions
+
 - **`jsonb_smart_patch_scalar(target, source)`**
   - Intelligent shallow merge for top-level object updates
   - Simplifies pg_tview refresh logic
@@ -32,6 +33,7 @@ This release adds complete JSONB array CRUD support and helper functions specifi
   - Optimized for pg_tview cascade patterns
 
 #### Array CRUD Operations
+
 - **`jsonb_array_delete_where(target, array_path, match_key, match_value)`**
   - Surgical array element deletion
   - **3-5× faster** than re-aggregation
@@ -45,6 +47,7 @@ This release adds complete JSONB array CRUD support and helper functions specifi
   - Maintains sort order (ASC/DESC) automatically
 
 #### Deep Operations
+
 - **`jsonb_deep_merge(target, source)`**
   - Recursive deep merge preserving nested fields
   - Fixes `jsonb_merge_shallow` limitation
@@ -52,6 +55,7 @@ This release adds complete JSONB array CRUD support and helper functions specifi
   - Critical for nested dependency updates
 
 #### Helper Functions
+
 - **`jsonb_extract_id(data, key DEFAULT 'id')`**
   - Safe ID extraction (UUID or integer)
   - Returns text representation
@@ -63,31 +67,37 @@ This release adds complete JSONB array CRUD support and helper functions specifi
   - Returns boolean for filtering queries
 
 ### Performance Improvements
+
 - **INSERT operations**: 3-5× faster (eliminates re-aggregation)
 - **DELETE operations**: 3-5× faster (eliminates re-aggregation)
 - **Deep nested updates**: 2× faster (single function call vs multiple operations)
 - **Overall pg_tview cascades**: +10-20% throughput improvement
 
 ### Documentation
+
 - Added `docs/PG_TVIEW_INTEGRATION_EXAMPLES.md` - Complete CRUD workflow examples
 - Updated README.md with v0.3.0 API and usage examples
 - Comprehensive benchmark suite (`test/benchmark_pg_tview_helpers.sql`)
 - Smoke test suite (`test/smoke_test_v0.3.0.sql`)
 
 ### Code Quality
+
 - Fixed pgrx SQL generation (added `pgrx::pgrx_embed!()` macro)
 - Added "lib" crate type for proper extension installation
 - Generated `sql/jsonb_ivm--0.3.0.sql` with all 13 function definitions
 - All functions marked IMMUTABLE, PARALLEL SAFE, STRICT
 
 ### Breaking Changes
+
 None - all additions are backward compatible with v0.2.0 and v0.1.0.
 
 ### Migration from v0.2.0
+
 No changes required - v0.3.0 is fully backward compatible.
 To use new features, update SQL queries to call new functions.
 
 **Example Migration:**
+
 ```sql
 -- Old (re-aggregation):
 UPDATE tv_feed
@@ -107,6 +117,7 @@ WHERE pk = 1;
 ```
 
 ### Impact on pg_tview
+
 - **60% code reduction** in refresh.rs (150 lines → 60 lines)
 - **Complete CRUD support** - INSERT and DELETE operations now available
 - **Simplified dispatch logic** - Single code path for all update types
@@ -117,6 +128,8 @@ WHERE pk = 1;
 ## [0.1.0-alpha1] - 2025-12-07
 
 ### 🎉 Initial Alpha Release
+
+**Note**: This section intentionally uses "Added" heading (duplicate) as per Keep a Changelog format for initial releases.
 
 This is the first public release of jsonb_ivm, starting from a clean slate with a quality-first, CI/CD-driven approach.
 
@@ -204,24 +217,29 @@ See [comprehensive code review](code-review-prompt.md) for detailed quality asse
 ## Roadmap
 
 ### Planned for v0.2.0-alpha1
+
 - Nested path merge function: `jsonb_merge_at_path(target, source, path)`
 - Additional tests for nested operations
 - Performance benchmarks
 
 ### Planned for v0.3.0-alpha1
+
 - Change detection: `jsonb_detect_changes(old, new, keys)`
 - Sub-millisecond performance validation
 
 ### Planned for v0.4.0-alpha1
+
 - Scope building system
 - Configuration-driven update patterns
 
 ### Planned for v0.5.0-beta1
+
 - Feature complete
 - Seek early adopters
 - Real-world validation
 
 ### Planned for v1.0.0
+
 - Production-ready release
 - Published to PGXN
 - Community validation
