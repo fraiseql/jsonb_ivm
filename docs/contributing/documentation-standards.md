@@ -26,7 +26,6 @@ Brief description of what the function does.
 SELECT function_name(...);
 -- Result: expected output
 ```
-```
 
 ### Heading Level Requirements
 
@@ -68,9 +67,10 @@ When adding a new function:
 
 1. **Implement the function** in `src/lib.rs` with `#[pg_extern]`
 2. **Add comprehensive documentation** to README.md API Reference
-3. **Use level 3 heading**: `### `function_name(parameters)``
+3. **Use level 3 heading**: `###`function_name(parameters)``
 4. **Include all required sections**: Parameters, Returns, Example
 5. **Test locally**:
+
    ```bash
    RUST_FUNCTIONS=$(grep -c "#\[pg_extern" src/lib.rs)
    README_FUNCTIONS=$(grep -c "^### \`jsonb_" README.md)

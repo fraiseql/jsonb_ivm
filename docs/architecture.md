@@ -280,7 +280,7 @@ fn deep_merge(target, source):
 
 ### Example: Company Name Update Propagation
 
-```
+```text
 1. UPDATE v_company SET name = 'New Name'
    └─> Trigger fires
 
@@ -317,6 +317,7 @@ fn deep_merge(target, source):
 ### Adding New Functions
 
 1. Implement Rust function in `src/lib.rs`:
+
    ```rust
    #[pg_extern(immutable, parallel_safe, strict)]
    fn my_new_function(data: JsonB) -> JsonB {
@@ -325,6 +326,7 @@ fn deep_merge(target, source):
    ```
 
 2. Add tests in `src/lib.rs`:
+
    ```rust
    #[cfg(test)]
    mod tests {
@@ -334,6 +336,7 @@ fn deep_merge(target, source):
    ```
 
 3. Add SQL tests in `test/sql/`:
+
    ```sql
    -- test/sql/08_my_feature.sql
    SELECT my_new_function('{"test": true}'::jsonb);
