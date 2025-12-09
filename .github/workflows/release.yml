@@ -69,7 +69,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: release-artifacts/*/*.tar.gz
-          body_path: CHANGELOG.md
+          body_path: changelog.md
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
         env:

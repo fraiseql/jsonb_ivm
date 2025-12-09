@@ -68,16 +68,33 @@ jobs:
           sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
           sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
 
-          # Run tests
-          sudo -u postgres psql -d test_jsonb_ivm -f test/sql/01_merge_shallow.sql > test_output.txt 2>&1 || true
+          # Create extension
+          sudo -u postgres psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
 
-          # Verify extension works
-          if sudo -u postgres psql -d test_jsonb_ivm -c "SELECT count(*) FROM (SELECT jsonb_merge_shallow('{}', '{}')) s;" | grep -q "1"; then
-            echo "✓ Extension loaded and functional"
-          else
-            echo "✗ Extension failed to load"
-            cat test_output.txt
+          # Run all test files
+          for test_file in test/sql/*.sql; do
+            echo "Running $test_file..."
+            sudo -u postgres psql -d test_jsonb_ivm -f "$test_file" > "test_output_$(basename $test_file).txt" 2>&1
+
+            if [ $? -ne 0 ]; then
+              echo "❌ FAILED: $test_file"
+              cat "test_output_$(basename $test_file).txt"
+              exit 1
+            else
+              echo "✅ PASSED: $test_file"
+            fi
+          done
+
+          # Run v0.3.0 smoke tests
+          echo "Running v0.3.0 smoke tests..."
+          sudo -u postgres psql -d test_jsonb_ivm -f test/smoke_test_v0.3.0.sql > test_output_smoke_v0.3.0.txt 2>&1
+
+          if [ $? -ne 0 ]; then
+            echo "❌ FAILED: v0.3.0 smoke tests"
+            cat test_output_smoke_v0.3.0.txt
             exit 1
+          else
+            echo "✅ PASSED: v0.3.0 smoke tests"
           fi
 
       - name: Upload test results
@@ -86,5 +103,5 @@ jobs:
         with:
           name: test-results-pg${{ matrix.pg-version }}
           path: |
-            test_output.txt
+            test_output_*.txt
           if-no-files-found: ignore
