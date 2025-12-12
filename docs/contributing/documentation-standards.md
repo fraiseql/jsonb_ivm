@@ -167,7 +167,7 @@ All changes must be documented in `changelog.md`:
 
 Tests are organized in `test/` directory:
 
-```
+```text
 test/
 ├── sql/           # SQL integration tests
 │   ├── 01_merge_shallow.sql

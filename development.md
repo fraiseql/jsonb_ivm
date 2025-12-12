@@ -57,7 +57,7 @@ done
 
 ## Code Structure
 
-```
+```text
 src/
 └── lib.rs              # Main extension code
     ├── jsonb_merge_shallow  # Core merge function

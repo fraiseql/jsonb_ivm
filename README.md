@@ -1,6 +1,6 @@
 # jsonb_ivm
 
-**Surgical JSONB updates for PostgreSQL CQRS architectures**
+Surgical JSONB updates for PostgreSQL CQRS architectures
 
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13--18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-PostgreSQL-blue.svg)](LICENSE)

@@ -154,7 +154,6 @@ jobs:
   markdown-links:
     name: Markdown Link Check
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't fail CI on broken links in docs
     steps:
       - uses: actions/checkout@v4
 
@@ -175,7 +174,6 @@ jobs:
   markdown-lint:
     name: Markdown Lint
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't fail CI on markdown style issues
     steps:
       - uses: actions/checkout@v4
 

@@ -16,6 +16,7 @@ Complete JSONB CRUD operations for PostgreSQL CQRS architectures. **2-7× faster
 ### Added
 
 #### Core Functions
+
 - **`jsonb_merge_shallow(target, source)`**
   - Shallow merge of two JSONB objects
   - Source keys overwrite target keys on conflict
@@ -25,6 +26,7 @@ Complete JSONB CRUD operations for PostgreSQL CQRS architectures. **2-7× faster
   - Array-based path specification
 
 #### Smart Patch Functions
+
 - **`jsonb_smart_patch_scalar(target, source)`**
   - Intelligent shallow merge for top-level updates
   - Simplifies incremental view maintenance
@@ -38,6 +40,7 @@ Complete JSONB CRUD operations for PostgreSQL CQRS architectures. **2-7× faster
   - Combines search and update in single operation
 
 #### Array Operations
+
 - **`jsonb_array_update_where(target, array_path, match_key, match_value, updates)`**
   - Update single array element by matching predicate
   - **2-3× faster** than SQL re-aggregation
@@ -59,12 +62,14 @@ Complete JSONB CRUD operations for PostgreSQL CQRS architectures. **2-7× faster
   - **5-7× faster** than re-aggregation
 
 #### Deep Merge
+
 - **`jsonb_deep_merge(target, source)`**
   - Recursive deep merge for nested structures
   - Preserves existing fields while updating changed ones
   - **2× faster** than multiple path-based operations
 
 #### Helper Functions
+
 - **`jsonb_extract_id(data, key DEFAULT 'id')`**
   - Safe ID extraction (supports UUID and integer)
   - Returns text representation
@@ -83,12 +88,14 @@ Complete JSONB CRUD operations for PostgreSQL CQRS architectures. **2-7× faster
 | Deep merge | 8-12 ms | 4-6 ms | **2×** |
 
 ### Compatibility
+
 - PostgreSQL 13-18 support
 - Zero external dependencies
 - Pure Rust implementation with pgrx 0.16.1
 - All functions: IMMUTABLE, PARALLEL SAFE, STRICT
 
 ### Documentation
+
 - Complete API reference with examples
 - Integration guide for CQRS/pg_tview workflows
 - Comprehensive test suite

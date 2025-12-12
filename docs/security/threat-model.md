@@ -142,7 +142,6 @@ GRANT EXECUTE ON FUNCTION jsonb_merge_shallow(jsonb, jsonb) TO app_user;
 REVOKE ALL ON TABLE source_table FROM app_user;
 ```
 
-
 ---
 
 ### 6. Data Corruption

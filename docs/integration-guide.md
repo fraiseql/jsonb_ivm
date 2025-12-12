@@ -1,6 +1,6 @@
 # pg_tview Integration Examples
 
-**Complete CRUD workflow examples for incremental view maintenance using jsonb_ivm**
+Complete CRUD workflow examples for incremental view maintenance using jsonb_ivm.
 
 ---
 
@@ -65,7 +65,7 @@ CREATE TABLE tv_feed (
 
 ### Dependency Hierarchy
 
-```
+```text
 ┌─────────────┐
 │  v_company  │ ← Leaf view (UPDATE company.name)
 └─────────────┘
@@ -229,7 +229,7 @@ WHERE fk_user IN (SELECT pk FROM tv_user WHERE fk_company = 1);
 
 **Scenario**: Update post title in a feed containing 100 posts
 
-### Before (Traditional SQL - Re-aggregation)
+### Before - Example 3 (Traditional SQL - Re-aggregation)
 
 ```sql
 -- Update the post first
@@ -295,7 +295,7 @@ WHERE jsonb_array_contains_id(
 
 **Scenario**: Delete a post from the feed
 
-### Before (Traditional SQL - Re-aggregation)
+### Before - Example 4 (Traditional SQL - Re-aggregation)
 
 ```sql
 -- Step 1: Delete the post
@@ -345,7 +345,7 @@ END $$;
 -- Performance: ~4-6ms (removes 1 element in-place)
 ```
 
-**Alternative: Using a trigger**
+#### Alternative: Using a trigger
 
 ```sql
 -- Better approach: Use BEFORE DELETE trigger to capture ID
@@ -383,7 +383,7 @@ EXECUTE FUNCTION propagate_post_deletion();
 
 **Scenario**: Add a new post to the feed (sorted by `created_at DESC`)
 
-### Before (Traditional SQL - Re-aggregation)
+### Before - Example 5 (Traditional SQL - Re-aggregation)
 
 ```sql
 -- Step 1: Insert new post
@@ -495,7 +495,7 @@ WHERE fk_user IN (SELECT pk FROM tv_user WHERE fk_company = 1);
 -- Performance: O(n × k) where k = number of updated fields
 ```
 
-### After (jsonb_ivm - Deep Merge)
+### After - Deep Merge Pattern (jsonb_ivm - Deep Merge)
 
 ```sql
 -- Recursively merge company changes at any depth
@@ -527,7 +527,7 @@ WHERE fk_user IN (SELECT pk FROM tv_user WHERE fk_company = 1);
 
 ### Decision Tree: Which Function to Use?
 
-```
+```text
 What are you updating?
 ├─ Top-level scalar field (e.g., user.name)
 │  └─ Use: jsonb_smart_patch_scalar()
@@ -602,12 +602,14 @@ SELECT jsonb_array_delete_where(
 ### 1. Use Containment Checks to Filter Rows
 
 **Bad** (updates all rows):
+
 ```sql
 UPDATE tv_feed
 SET data = jsonb_array_delete_where(data, 'posts', 'id', '42'::jsonb);
 ```
 
 **Good** (only updates affected rows):
+
 ```sql
 UPDATE tv_feed
 SET data = jsonb_array_delete_where(data, 'posts', 'id', '42'::jsonb)
