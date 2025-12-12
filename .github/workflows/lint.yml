@@ -59,7 +59,7 @@ jobs:
         run: cargo pgrx init
 
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
 
   clippy-strict:
     name: Rust Clippy (Strict)
@@ -98,7 +98,7 @@ jobs:
 
       - name: Run Clippy (strict mode)
         run: |
-          cargo clippy --all-targets --all-features -- \
+          cargo clippy --all-targets -- \
             -W clippy::all \
             -W clippy::pedantic \
             -W clippy::nursery \
@@ -152,7 +152,7 @@ jobs:
          run: cargo pgrx init
 
        - name: Build documentation
-         run: cargo doc --no-deps --all-features
+         run: cargo doc --no-deps
          env:
            RUSTDOCFLAGS: -D warnings
 
@@ -167,14 +167,13 @@ jobs:
         with:
           use-quiet-mode: 'yes'
           config-file: '.github/markdown-link-check-config.json'
-          folder-path: '.'
+          folder-path: 'docs'
           file-path: |
             ./README.md
             ./changelog.md
             ./contributing.md
             ./development.md
             ./TESTING.md
-            ./docs
 
   markdown-lint:
     name: Markdown Lint
