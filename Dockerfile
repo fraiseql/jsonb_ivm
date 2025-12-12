@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
 # Install pgrx
 RUN cargo install cargo-pgrx --locked
 
-# Set up pgrx
-RUN cargo pgrx init --pg17 download
+# Set up pgrx (disable readline for container build)
+RUN PGRX_BUILD_FLAGS="--without-readline" cargo pgrx init --pg17 download
 
 WORKDIR /build
 
