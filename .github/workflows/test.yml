@@ -65,10 +65,12 @@ jobs:
               postgresql-${{ matrix.pg-version }} \
               postgresql-server-dev-${{ matrix.pg-version }}
 
-            # Create and start cluster if it doesn't exist
-            if ! sudo pg_lsclusters | grep -q "${{ matrix.pg-version }} main"; then
-              sudo pg_createcluster ${{ matrix.pg-version }} main --start
+            # Create and start cluster if it doesn't exist, or start if exists but down
+            if ! sudo pg_lsclusters -h | grep -q "^${{ matrix.pg-version }} main"; then
+              # Cluster doesn't exist, create it
+              sudo pg_createcluster ${{ matrix.pg-version }} main --start || true
             else
+              # Cluster exists, ensure it's running
               sudo pg_ctlcluster ${{ matrix.pg-version }} main start || true
             fi
 
