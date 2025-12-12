@@ -1,0 +1,81 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'benchmark')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-benchmark-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install PostgreSQL 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            postgresql-17 \
+            postgresql-server-dev-17
+
+      - name: Install cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.16.1
+
+      - name: Initialize pgrx
+        run: cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config
+
+      - name: Build extension
+        run: cargo build --release --locked
+
+      - name: Install extension
+        run: cargo pgrx install --pg-config=/usr/lib/postgresql/17/bin/pg_config --release
+
+      - name: Run benchmarks
+        run: |
+          sudo systemctl start postgresql@17-main || true
+          sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
+          sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
+          sudo -u postgres psql -d test_jsonb_ivm -c "CREATE EXTENSION jsonb_ivm;"
+
+          sudo -u postgres psql -d test_jsonb_ivm \
+            -f test/benchmark_pg_tview_helpers.sql \
+            > benchmark_results.txt 2>&1
+
+      - name: Parse benchmark results
+        run: |
+          # Extract timing from benchmark output
+          grep "Execution time:" benchmark_results.txt > timings.txt
+
+          # Compare with baseline (if exists)
+          if [ -f benchmark_baseline.txt ]; then
+            # Simple comparison (can be enhanced with statistical analysis)
+            echo "Comparing with baseline..."
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark_results.txt
+            timings.txt

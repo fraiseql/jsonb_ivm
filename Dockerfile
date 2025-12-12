@@ -1,0 +1,63 @@
+# Dockerfile for jsonb_ivm PostgreSQL Extension
+# Multi-stage build for minimal production image
+
+# =============================================================================
+# Stage 1: Builder
+# =============================================================================
+FROM rust:1.85-slim-bookworm AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libclang-dev \
+    pkg-config \
+    postgresql-server-dev-all \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pgrx
+RUN cargo install cargo-pgrx --locked
+
+# Set up pgrx
+RUN cargo pgrx init --pg17 download
+
+WORKDIR /build
+
+# Copy source code
+COPY Cargo.toml Cargo.lock ./
+COPY src/ ./src/
+
+# Build extension
+RUN cargo pgrx package --pg-config /root/.pgrx/17.2/pgrx-install/bin/pg_config
+
+# =============================================================================
+# Stage 2: Production
+# =============================================================================
+FROM postgres:17-bookworm
+
+LABEL org.opencontainers.image.title="jsonb_ivm"
+LABEL org.opencontainers.image.description="Incremental JSONB View Maintenance for PostgreSQL"
+LABEL org.opencontainers.image.version="0.3.1"
+LABEL org.opencontainers.image.vendor="FraiseQL"
+LABEL org.opencontainers.image.licenses="PostgreSQL"
+LABEL org.opencontainers.image.source="https://github.com/fraiseql/jsonb_ivm"
+
+# Copy extension files from builder
+COPY --from=builder /build/target/release/jsonb_ivm-pg17/usr/share/postgresql/17/extension/* \
+    /usr/share/postgresql/17/extension/
+COPY --from=builder /build/target/release/jsonb_ivm-pg17/usr/lib/postgresql/17/lib/* \
+    /usr/lib/postgresql/17/lib/
+
+# Create extension in template database (optional)
+# RUN service postgresql start && \
+#     psql -U postgres -c "CREATE EXTENSION jsonb_ivm;" template1 && \
+#     service postgresql stop
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD pg_isready -U postgres || exit 1
+
+# Expose PostgreSQL port
+EXPOSE 5432
+
+# Default command
+CMD ["postgres"]
