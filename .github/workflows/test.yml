@@ -64,6 +64,13 @@ jobs:
             sudo apt-get install -y \
               postgresql-${{ matrix.pg-version }} \
               postgresql-server-dev-${{ matrix.pg-version }}
+
+            # Create and start cluster if it doesn't exist
+            if ! sudo pg_lsclusters | grep -q "${{ matrix.pg-version }} main"; then
+              sudo pg_createcluster ${{ matrix.pg-version }} main --start
+            else
+              sudo pg_ctlcluster ${{ matrix.pg-version }} main start || true
+            fi
           elif [ "$RUNNER_OS" == "macOS" ]; then
             brew install postgresql@${{ matrix.pg-version }}
             brew services start postgresql@${{ matrix.pg-version }}
@@ -97,11 +104,9 @@ jobs:
       - name: Run SQL integration tests
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo pg_ctlcluster ${{ matrix.pg-version }} main start || sudo systemctl start postgresql@${{ matrix.pg-version }}-main || true
             sudo -u postgres psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
             sudo -u postgres psql -c "CREATE DATABASE test_jsonb_ivm;"
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            # macOS PostgreSQL is already started via brew services
             psql -c "DROP DATABASE IF EXISTS test_jsonb_ivm;" || true
             psql -c "CREATE DATABASE test_jsonb_ivm;"
           fi
