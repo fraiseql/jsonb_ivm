@@ -173,8 +173,8 @@ jobs:
             export PGPORT=$PG_PORT
           fi
 
-          # Generate schema and compare with committed version
-          cargo pgrx schema > /tmp/generated-schema.sql
+          # Generate schema using the correct PostgreSQL version
+          cargo pgrx schema pg${{ matrix.pg-version }} > /tmp/generated-schema.sql
 
           # Check if schema matches committed version
           if ! diff -u sql/jsonb_ivm--0.1.0.sql /tmp/generated-schema.sql; then
