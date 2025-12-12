@@ -89,9 +89,9 @@ jobs:
       - name: Install extension
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release
+            cargo pgrx install --pg-config=/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --release --sudo
           elif [ "$RUNNER_OS" == "macOS" ]; then
-            sudo cargo pgrx install --pg-config=/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin/pg_config --release
+            cargo pgrx install --pg-config=/usr/local/opt/postgresql@${{ matrix.pg-version }}/bin/pg_config --release --sudo
           fi
 
       - name: Run SQL integration tests
