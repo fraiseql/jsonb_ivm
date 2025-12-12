@@ -93,30 +93,34 @@ SET data = jsonb_smart_patch_array(
 WHERE id = 1;
 ```
 
-**See**: [Quick Start Guide](docs/quick-start.md) for full walkthrough
-
 ---
 
 ## Performance
 
 | Operation | Native SQL | jsonb_ivm | Speedup |
 |-----------|-----------|-----------|---------|
-| Array element update | 1.91 ms | 0.72 ms | **2.66×** |
-| Array DELETE | 20-30 ms | 4-6 ms | **5-7×** |
-| Array INSERT (sorted) | 22-35 ms | 5-8 ms | **4-6×** |
-| Deep merge | 8-12 ms | 4-6 ms | **2×** |
+| Array element update | 3.2 ms | 1.1 ms | **2.9×** |
+| Array DELETE | 4.1 ms | 0.6 ms | **6.8×** |
+| Batch update (10 items) | 32 ms | 6 ms | **5.2×** |
+| Multi-row (100 rows) | 450 ms | 110 ms | **4.1×** |
 
-**See**: [Benchmark Results](docs/implementation/benchmark-results.md) for detailed analysis
+**See**: [Performance Benchmarks](docs/PERFORMANCE.md) for detailed analysis and methodology
 
 ---
 
 ## API Overview
 
-### Smart Patch Functions
+### Core Functions
 
-- `jsonb_smart_patch_scalar(target, source)` - Intelligent shallow merge
-- `jsonb_smart_patch_nested(target, source, path)` - Merge at nested path
-- `jsonb_smart_patch_array(target, source, array_path, match_key, match_value)` - Update array element
+- `jsonb_merge_shallow(target, source)` - Fast top-level merge
+- `jsonb_merge_at_path(target, source, path)` - Merge at nested path
+- `jsonb_deep_merge(target, source)` - Recursive deep merge
+
+### Array Updates
+
+- `jsonb_array_update_where(target, array_path, match_key, match_value, updates)` - Update single element
+- `jsonb_array_update_where_batch(target, array_path, match_key, updates_array)` - Batch updates
+- `jsonb_array_update_multi_row(targets[], array_path, match_key, match_value, updates)` - Multi-row updates
 
 ### Array CRUD
 
@@ -124,21 +128,22 @@ WHERE id = 1;
 - `jsonb_array_delete_where(target, array_path, match_key, match_value)` - Delete element
 - `jsonb_array_contains_id(data, array_path, key, value)` - Check existence
 
-### Deep Merge
+### Smart Patch Functions
 
-- `jsonb_deep_merge(target, source)` - Recursive deep merge
+- `jsonb_smart_patch_scalar(target, source)` - Intelligent shallow merge
+- `jsonb_smart_patch_nested(target, source, path)` - Merge at nested path
+- `jsonb_smart_patch_array(target, source, array_path, match_key, match_value)` - Update array element
 
-**See**: [API Reference](docs/api-reference.md) for complete function documentation
+**See**: [API Reference](docs/API.md) for complete function documentation with examples
 
 ---
 
 ## Documentation
 
-- **[Quick Start Guide](docs/quick-start.md)** - Get up and running in 5 minutes
-- **[API Reference](docs/api-reference.md)** - Complete function reference
-- **[Integration Guide](docs/integration-guide.md)** - Real-world CRUD workflows
-- **[Architecture](docs/architecture.md)** - Technical design and implementation
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[API Reference](docs/API.md)** - Complete function reference with examples
+- **[Performance Benchmarks](docs/PERFORMANCE.md)** - Detailed benchmarks and methodology
+- **[Architecture](docs/ARCHITECTURE.md)** - Design decisions and technical details
+- **[Rust API Docs](https://docs.rs/jsonb_ivm)** - Generated from source code (coming soon)
 
 ---
 
