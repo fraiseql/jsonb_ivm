@@ -164,6 +164,15 @@ jobs:
 
       - name: Validate SQL schema generation
         run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            # Get the port for this PostgreSQL version
+            PG_PORT=$(sudo pg_lsclusters -h | grep "^${{ matrix.pg-version }} main" | awk '{print $3}')
+            echo "Using PostgreSQL on port $PG_PORT for schema generation"
+
+            # Set PGPORT for pgrx to use
+            export PGPORT=$PG_PORT
+          fi
+
           # Generate schema and compare with committed version
           cargo pgrx schema > /tmp/generated-schema.sql
 
