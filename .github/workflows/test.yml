@@ -84,7 +84,7 @@ jobs:
 
       - name: Build extension
         run: |
-          cargo build --release --locked
+          cargo build --release --locked --no-default-features --features pg${{ matrix.pg-version }}
 
       - name: Install extension
         run: |
