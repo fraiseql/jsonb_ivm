@@ -53,7 +53,7 @@ jobs:
         run: cargo build --release --locked --no-default-features --features pg17
 
       - name: Install extension
-        run: cargo pgrx install --pg-config=/usr/lib/postgresql/17/bin/pg_config --release
+        run: sudo cargo pgrx install --pg-config=/usr/lib/postgresql/17/bin/pg_config --release
 
       - name: Run benchmarks
         run: |

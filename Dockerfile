@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     libclang-dev \
     pkg-config \
     postgresql-server-dev-all \
+    bison \
+    flex \
     && rm -rf /var/lib/apt/lists/*
 
 # Install pgrx
@@ -36,7 +38,7 @@ FROM postgres:17-bookworm
 
 LABEL org.opencontainers.image.title="jsonb_ivm"
 LABEL org.opencontainers.image.description="Incremental JSONB View Maintenance for PostgreSQL"
-LABEL org.opencontainers.image.version="0.3.1"
+LABEL org.opencontainers.image.version="0.1.0"
 LABEL org.opencontainers.image.vendor="FraiseQL"
 LABEL org.opencontainers.image.licenses="PostgreSQL"
 LABEL org.opencontainers.image.source="https://github.com/fraiseql/jsonb_ivm"
