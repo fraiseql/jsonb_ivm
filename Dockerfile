@@ -50,10 +50,10 @@ LABEL org.opencontainers.image.vendor="FraiseQL"
 LABEL org.opencontainers.image.licenses="PostgreSQL"
 LABEL org.opencontainers.image.source="https://github.com/fraiseql/jsonb_ivm"
 
-# Copy extension files from builder
-COPY --from=builder /build/target/release/jsonb_ivm-pg17/usr/share/postgresql/17/extension/* \
+# Copy extension files from builder (pgrx package creates these paths)
+COPY --from=builder /build/target/release/jsonb_ivm-pg17/root/.pgrx/17.7/pgrx-install/share/postgresql/extension/* \
     /usr/share/postgresql/17/extension/
-COPY --from=builder /build/target/release/jsonb_ivm-pg17/usr/lib/postgresql/17/lib/* \
+COPY --from=builder /build/target/release/jsonb_ivm-pg17/root/.pgrx/17.7/pgrx-install/lib/postgresql/* \
     /usr/lib/postgresql/17/lib/
 
 # Create extension in template database (optional)
