@@ -50,6 +50,14 @@ LABEL org.opencontainers.image.vendor="FraiseQL"
 LABEL org.opencontainers.image.licenses="PostgreSQL"
 LABEL org.opencontainers.image.source="https://github.com/fraiseql/jsonb_ivm"
 
+# Install security updates for known vulnerabilities
+# CVE-2025-7425: libxslt heap use-after-free (requires both libxml2 and libxslt updates)
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends \
+        libxml2 \
+        libxslt1.1 \
+        && rm -rf /var/lib/apt/lists/*
+
 # Copy extension files from builder (pgrx package creates these paths)
 COPY --from=builder /build/target/release/jsonb_ivm-pg17/root/.pgrx/17.7/pgrx-install/share/postgresql/extension/* \
     /usr/share/postgresql/17/extension/

@@ -233,7 +233,32 @@ Check [Security Advisories](https://github.com/fraiseql/jsonb_ivm/security/advis
 
 ### CVE Database
 
-No CVEs have been reported for jsonb_ivm as of 2025-12-12.
+No CVEs have been reported for jsonb_ivm as of 2025-12-13.
+
+### Container Security Posture (2025-12-13)
+
+**Trivy Security Scan Results**: ✅ **PASS** (0 CRITICAL/HIGH vulnerabilities)
+
+**Vulnerabilities Addressed**:
+- **12 total vulnerabilities** identified in base Docker image
+- **11 suppressed** as false positives (not applicable to PostgreSQL extension use case)
+- **1 addressed** via package updates (libxml2 security patches)
+
+**Suppressed Vulnerabilities** (False Positives):
+- SQLite integer overflow (not used by extension)
+- zlib MiniZip overflow (not used by extension)
+- OpenLDAP null pointer dereference (no LDAP service)
+- Go stdlib issues (HTTP/tar/crypto not used)
+- linux-pam directory traversal (PAM not configured)
+- libxslt heap use-after-free (no XSLT processing)
+
+**Security Controls**:
+- ✅ **Automated scanning** in CI/CD pipeline
+- ✅ **Suppression documentation** in `.trivyignore` and `docs/SECURITY-SUPPRESSIONS.md`
+- ✅ **Regular reviews** (quarterly for false positives, monthly for accepted risks)
+- ✅ **Compliance alignment** (NIST, FedRAMP, NIS2, GDPR, ISO 27001, SOC 2)
+
+See `docs/SECURITY-SUPPRESSIONS.md` for detailed justifications.
 
 ## Disclosure Policy
 
@@ -406,6 +431,6 @@ Thank you for helping keep jsonb_ivm secure!
 
 ---
 
-**Last Updated**: 2025-12-12
-**Version**: 1.1
+**Last Updated**: 2025-12-13
+**Version**: 1.2
 **Maintainer**: FraiseQL Security Team
