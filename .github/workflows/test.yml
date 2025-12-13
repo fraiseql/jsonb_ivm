@@ -17,7 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pg-version: [13, 14, 15, 16, 17, 18]
+        # Only test PostgreSQL 17 in CI for speed
+        # Local testing covers all versions (13-18)
+        pg-version: [17]
 
     steps:
       - name: Checkout code

@@ -287,7 +287,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo build --release
 
 # Full test matrix (requires all PostgreSQL versions)
-for version in 13 14 15 16 17; do
+# ⚠️ IMPORTANT: CI only tests PostgreSQL 17 for speed
+#    Run this locally before major releases to ensure compatibility
+for version in 13 14 15 16 17 18; do
     echo "→ Testing PostgreSQL $version..."
     cargo pgrx test pg$version --release
 done
@@ -380,8 +382,8 @@ $$;
 **File**: `.github/workflows/test.yml`
 
 **Matrix**:
-- PostgreSQL versions: 13, 14, 15, 16, 17
-- Operating systems: Ubuntu, macOS
+- PostgreSQL versions: **17 only** (for CI speed; local testing covers all versions 13-18)
+- Operating systems: Ubuntu
 
 **Steps**:
 1. Install Rust + PostgreSQL
