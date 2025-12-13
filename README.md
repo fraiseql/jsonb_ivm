@@ -93,6 +93,37 @@ SET data = jsonb_smart_patch_array(
 WHERE id = 1;
 ```
 
+### Nested Path Support (v0.2.0+)
+
+Update deeply nested fields using dot notation and array indexing:
+
+```sql
+-- Update nested field in array element
+UPDATE user_views
+SET data = jsonb_ivm_array_update_where_path(
+    data,
+    'users',                    -- array location
+    'id', '123'::jsonb,        -- match user with ID 123
+    'profile.settings.theme',  -- NESTED PATH to update
+    '"dark"'::jsonb            -- new value
+)
+WHERE id = 1;
+
+-- Set value at complex nested path
+UPDATE order_views
+SET data = jsonb_ivm_set_path(
+    data,
+    'orders[0].items[1].price',  -- Complex path
+    '29.99'::jsonb
+)
+WHERE id = 1;
+```
+
+**Supported Syntax**:
+- ✅ `field.subfield` - Object property access
+- ✅ `array[0]` - Array element access
+- ✅ `orders[0].items[1].price` - Combined navigation
+
 ---
 
 ## Performance
@@ -119,8 +150,13 @@ WHERE id = 1;
 ### Array Updates
 
 - `jsonb_array_update_where(target, array_path, match_key, match_value, updates)` - Update single element
+- `jsonb_ivm_array_update_where_path(target, array_key, match_key, match_value, update_path, update_value)` - Update nested field in array element
 - `jsonb_array_update_where_batch(target, array_path, match_key, updates_array)` - Batch updates
 - `jsonb_array_update_multi_row(targets[], array_path, match_key, match_value, updates)` - Multi-row updates
+
+### Path Operations
+
+- `jsonb_ivm_set_path(target, path, value)` - Set value at any nested path
 
 ### Array CRUD
 

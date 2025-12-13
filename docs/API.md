@@ -14,6 +14,7 @@ This document provides comprehensive documentation for all functions in the `jso
   - [jsonb_array_update_where](#jsonb_array_update_where)
   - [jsonb_array_update_where_batch](#jsonb_array_update_where_batch)
   - [jsonb_array_update_multi_row](#jsonb_array_update_multi_row)
+  - [jsonb_ivm_array_update_where_path](#jsonb_ivm_array_update_where_path)
 - [Array CRUD Operations](#array-crud-operations)
   - [jsonb_array_insert_where](#jsonb_array_insert_where)
   - [jsonb_array_delete_where](#jsonb_array_delete_where)
@@ -24,6 +25,7 @@ This document provides comprehensive documentation for all functions in the `jso
 - [Helper Functions](#helper-functions)
   - [jsonb_extract_id](#jsonb_extract_id)
   - [jsonb_array_contains_id](#jsonb_array_contains_id)
+  - [jsonb_ivm_set_path](#jsonb_ivm_set_path)
 
 ---
 
@@ -191,6 +193,56 @@ SELECT * FROM jsonb_array_update_multi_row(
 ```
 
 **See also**: [Performance benchmarks](./PERFORMANCE.md#multi-row-operations)
+
+---
+
+### jsonb_ivm_array_update_where_path
+
+**Signature**: `jsonb_ivm_array_update_where_path(target jsonb, array_key text, match_key text, match_value jsonb, update_path text, update_value jsonb) → jsonb`
+
+**Description**: Update a nested field in a JSONB array element using dot notation and array indexing paths.
+
+**Properties**: `IMMUTABLE STRICT PARALLEL SAFE`
+
+**Performance**: Same as `jsonb_array_update_where` with path navigation overhead.
+
+**Use Case**: Update deeply nested fields in array elements (e.g., update a user's profile settings in a user array).
+
+**Syntax**:
+- Dot notation: `field.subfield` → navigate object properties
+- Array indexing: `field[0]` → access array elements
+- Combined: `orders[0].items[1].price` → complex nested navigation
+
+**Example**:
+
+```sql
+-- Update nested field in array element
+SELECT jsonb_ivm_array_update_where_path(
+    '{"users": [{"id": 1, "profile": {"name": "Alice", "settings": {"theme": "light"}}}, {"id": 2, "profile": {"name": "Bob"}}]}'::jsonb,
+    'users',                    -- array location
+    'id', '1'::jsonb,          -- match condition
+    'profile.settings.theme',  -- NESTED PATH to update
+    '"dark"'::jsonb            -- new value
+);
+-- Result: {"users": [{"id": 1, "profile": {"name": "Alice", "settings": {"theme": "dark"}}}, {"id": 2, "profile": {"name": "Bob"}}]}
+
+-- Update array element within array element
+SELECT jsonb_ivm_array_update_where_path(
+    '{"companies": [{"id": 1, "departments": [{"name": "engineering", "employees": [{"name": "Alice", "salary": 50000}]}]}]}'::jsonb,
+    'companies',
+    'id', '1'::jsonb,
+    'departments[0].employees[0].salary',  -- Complex nested path
+    '60000'::jsonb
+);
+-- Result: {"companies": [{"id": 1, "departments": [{"name": "engineering", "employees": [{"name": "Alice", "salary": 60000}]}]}]}
+```
+
+**Limitations**:
+- Max path depth: 100 segments
+- No negative indices (use PostgreSQL's `jsonb_array_length`)
+- No wildcards (use PostgreSQL's `jsonb_path_query`)
+
+**See also**: [jsonb_ivm_set_path](#jsonb_ivm_set_path) for general path operations
 
 ---
 
@@ -391,6 +443,52 @@ SELECT jsonb_array_contains_id(
 );
 -- Result: false
 ```
+
+---
+
+### jsonb_ivm_set_path
+
+**Signature**: `jsonb_ivm_set_path(target jsonb, path text, value jsonb) → jsonb`
+
+**Description**: Set a value at any nested path in a JSONB document using dot notation and array indexing.
+
+**Properties**: `IMMUTABLE STRICT PARALLEL SAFE`
+
+**Use Case**: General-purpose path-based updates for complex JSONB structures.
+
+**Syntax**: Same as `jsonb_ivm_array_update_where_path` - supports dot notation and array indexing.
+
+**Example**:
+
+```sql
+-- Set nested object field
+SELECT jsonb_ivm_set_path(
+    '{"user": {"profile": {"settings": {}}}}'::jsonb,
+    'user.profile.settings.theme',
+    '"dark"'::jsonb
+);
+-- Result: {"user": {"profile": {"settings": {"theme": "dark"}}}}
+
+-- Set array element
+SELECT jsonb_ivm_set_path(
+    '{"items": []}'::jsonb,
+    'items[0]',
+    '{"name": "first item", "qty": 1}'::jsonb
+);
+-- Result: {"items": [{"name": "first item", "qty": 1}]}
+
+-- Complex nested path
+SELECT jsonb_ivm_set_path(
+    '{"orders": [{"items": [{}]}]}'::jsonb,
+    'orders[0].items[0].price',
+    '29.99'::jsonb
+);
+-- Result: {"orders": [{"items": [{"price": 29.99}]}]}
+```
+
+**Note**: Creates intermediate objects/arrays as needed. Use with caution as it may create deeply nested structures.
+
+**See also**: [jsonb_ivm_array_update_where_path](#jsonb_ivm_array_update_where_path) for array-specific updates
 
 ---
 

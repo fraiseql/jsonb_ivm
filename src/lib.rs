@@ -31,6 +31,7 @@ pub mod pg_test {
 mod array_ops;
 mod depth;
 mod merge;
+pub mod path; // Public for doc tests
 mod search;
 
 // Re-exports for public API (maintains backward compatibility)
@@ -38,6 +39,7 @@ pub use array_ops::*;
 pub use depth::validate_depth;
 pub use depth::MAX_JSONB_DEPTH;
 pub use merge::*;
+pub use path::*;
 
 /// Extract ID value from JSONB document
 ///
@@ -190,6 +192,161 @@ fn find_element_by_match(array: &[Value], match_key: &str, match_value: &Value) 
         },
         |int_id| crate::search::find_by_int_id_optimized(array, match_key, int_id),
     )
+}
+
+/// Update a field in a JSONB array element using nested paths (Phase 3)
+///
+/// This is the path-based variant of `jsonb_array_update_where` that supports
+/// nested object navigation using dot notation and array indexing.
+///
+/// # Arguments
+/// * `target` - JSONB document containing the array
+/// * `array_key` - Key/path to the array (single level for array location)
+/// * `match_key` - Key to match elements on
+/// * `match_value` - Value to match
+/// * `update_path` - NESTED PATH to the field to update (e.g., "profile.name")
+/// * `update_value` - New value for the field
+///
+/// # Returns
+/// Updated JSONB document
+///
+/// # Examples
+/// ```sql
+/// -- Update nested field in array element
+/// SELECT jsonb_ivm_array_update_where_path(
+///     '{"users": [{"id": 1, "profile": {"name": "Alice"}}]}'::jsonb,
+///     'users',           -- array location
+///     'id', '1'::jsonb,  -- match condition
+///     'profile.name',    -- NESTED PATH to update
+///     '"Bob"'::jsonb     -- new value
+/// );
+/// -- Result: {"users": [{"id": 1, "profile": {"name": "Bob"}}]}
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_ivm_array_update_where_path(
+    target: JsonB,
+    array_key: &str,
+    match_key: &str,
+    match_value: JsonB,
+    update_path: &str,
+    update_value: JsonB,
+) -> JsonB {
+    let mut target_value: Value = target.0;
+
+    // Parse the update path
+    let update_segments = parse_path(update_path)
+        .unwrap_or_else(|e| error!("Invalid update path '{}': {}", update_path, e));
+
+    // Navigate to array location (single level for now)
+    let Some(array) = target_value.get_mut(array_key) else {
+        error!("Array path '{}' does not exist in document", array_key);
+    };
+
+    let Some(array_items) = array.as_array_mut() else {
+        error!(
+            "Path '{}' does not point to an array, found: {}",
+            array_key,
+            value_type_name(array)
+        );
+    };
+
+    // Extract match value
+    let match_val = match_value.0;
+
+    // Security: Validate depth limits
+    crate::validate_depth(&update_value.0, crate::MAX_JSONB_DEPTH)
+        .unwrap_or_else(|e| error!("{}", e));
+
+    // Find matching element
+    let match_idx = find_element_by_match(array_items, match_key, &match_val);
+
+    // Apply update if match found
+    if let Some(idx) = match_idx {
+        // Navigate to the field within the element using the parsed path
+        let mut current = &mut array_items[idx];
+        for segment in &update_segments[..update_segments.len() - 1] {
+            match segment {
+                PathSegment::Key(key) => {
+                    if !current.is_object() {
+                        *current = Value::Object(serde_json::Map::new());
+                    }
+                    let obj = current.as_object_mut().unwrap();
+                    current = obj
+                        .entry(key.clone())
+                        .or_insert(Value::Object(serde_json::Map::new()));
+                }
+                PathSegment::Index(idx) => {
+                    if !current.is_array() {
+                        *current = Value::Array(Vec::new());
+                    }
+                    let arr = current.as_array_mut().unwrap();
+                    while arr.len() <= *idx {
+                        arr.push(Value::Null);
+                    }
+                    current = &mut arr[*idx];
+                }
+            }
+        }
+
+        // Set the final value
+        if let Some(PathSegment::Key(final_key)) = update_segments.last() {
+            if !current.is_object() {
+                *current = Value::Object(serde_json::Map::new());
+            }
+            let obj = current.as_object_mut().unwrap();
+            obj.insert(final_key.clone(), update_value.0);
+        }
+    }
+
+    JsonB(target_value)
+}
+
+/// Set a value at any nested path in a JSONB document (Phase 3)
+///
+/// General-purpose path-based setter that supports dot notation and array indexing.
+/// Creates intermediate objects/arrays as needed.
+///
+/// # Arguments
+/// * `target` - JSONB document to modify
+/// * `path` - Full path to set (e.g., "user.profile.settings.theme")
+/// * `value` - New value to set
+///
+/// # Returns
+/// Updated JSONB document
+///
+/// # Examples
+/// ```sql
+/// -- Set nested object field
+/// SELECT jsonb_ivm_set_path(
+///     '{"user": {"profile": {}}}'::jsonb,
+///     'user.profile.name',
+///     '"Alice"'::jsonb
+/// );
+/// -- Result: {"user": {"profile": {"name": "Alice"}}}
+///
+/// -- Set array element
+/// SELECT jsonb_ivm_set_path(
+///     '{"items": []}'::jsonb,
+///     'items[0]',
+///     '"first item"'::jsonb
+/// );
+/// -- Result: {"items": ["first item"]}
+/// ```
+#[pg_extern(immutable, parallel_safe, strict)]
+fn jsonb_ivm_set_path(target: JsonB, path: &str, value: JsonB) -> JsonB {
+    let mut target_value: Value = target.0;
+
+    // Parse the path
+    let segments = parse_path(path).unwrap_or_else(|e| error!("Invalid path '{}': {}", path, e));
+
+    // Security: Validate depth limits
+    crate::validate_depth(&value.0, crate::MAX_JSONB_DEPTH).unwrap_or_else(|e| error!("{}", e));
+
+    // Use the path module's set_path function
+    set_path(&mut target_value, &segments, value.0)
+        .unwrap_or_else(|e| error!("Failed to set path '{}': {}", path, e));
+
+    JsonB(target_value)
 }
 
 /// Helper function to get human-readable type name for error messages
