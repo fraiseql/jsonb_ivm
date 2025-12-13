@@ -138,6 +138,23 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libclang-dev \
+            pkg-config \
+            postgresql-server-dev-all \
+            libreadline-dev \
+            zlib1g-dev
+
+      - name: Install cargo-pgrx
+        run: cargo install cargo-pgrx --locked
+
+      - name: Initialize pgrx
+        run: cargo pgrx init --pg17 download
+
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
 

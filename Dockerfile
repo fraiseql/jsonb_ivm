@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     postgresql-server-dev-all \
     libreadline-dev \
+    zlib1g-dev \
     bison \
     flex \
     && rm -rf /var/lib/apt/lists/*
