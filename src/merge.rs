@@ -195,6 +195,10 @@ pub fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>
 ///
 /// Updated JSONB with source fields merged at root level
 ///
+/// # Panics
+///
+/// Panics if `jsonb_merge_shallow` returns `None` (should not happen with valid inputs).
+///
 /// # Examples
 ///
 /// ```sql
@@ -211,6 +215,7 @@ pub fn jsonb_merge_at_path(target: JsonB, source: JsonB, path: pgrx::Array<&str>
 /// WHERE pk_company = NEW.pk_company;
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
+#[must_use]
 pub fn jsonb_smart_patch_scalar(target: JsonB, source: JsonB) -> JsonB {
     jsonb_merge_shallow(Some(target), Some(source))
         .expect("jsonb_merge_shallow should not return NULL with valid inputs")
@@ -248,6 +253,7 @@ pub fn jsonb_smart_patch_scalar(target: JsonB, source: JsonB) -> JsonB {
 /// WHERE pk_user IN (SELECT pk_user FROM user_has_company WHERE fk_company = NEW.pk_company);
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
+#[must_use]
 pub fn jsonb_smart_patch_nested(target: JsonB, source: JsonB, path: pgrx::Array<&str>) -> JsonB {
     jsonb_merge_at_path(target, source, path)
 }
@@ -294,6 +300,7 @@ pub fn jsonb_smart_patch_nested(target: JsonB, source: JsonB, path: pgrx::Array<
 /// WHERE data->'posts' @> jsonb_build_array(jsonb_build_object('id', NEW.pk_post));
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
+#[allow(clippy::needless_pass_by_value)] // pgrx FFI signature required
 pub fn jsonb_smart_patch_array(
     target: JsonB,
     source: JsonB,
@@ -375,6 +382,7 @@ pub fn jsonb_smart_patch_array(
 /// WHERE data->>'company_id' = '123';
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
+#[must_use]
 pub fn jsonb_deep_merge(target: JsonB, source: JsonB) -> JsonB {
     let target_val = target.0;
     let source_val = source.0;
@@ -389,6 +397,7 @@ pub fn jsonb_deep_merge(target: JsonB, source: JsonB) -> JsonB {
 ///
 /// If both are objects, recursively merge their keys.
 /// Otherwise, source value replaces target value.
+#[must_use]
 pub fn deep_merge_recursive(target: Value, source: Value) -> Value {
     match (target, source) {
         (Value::Object(mut target_obj), Value::Object(source_obj)) => {
@@ -419,7 +428,7 @@ pub fn deep_merge_recursive(target: Value, source: Value) -> Value {
 }
 
 // Helper function - will be moved to a common utils module later
-fn value_type_name(value: &Value) -> &'static str {
+const fn value_type_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "boolean",

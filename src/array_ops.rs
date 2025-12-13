@@ -318,6 +318,7 @@ pub fn jsonb_array_update_multi_row(
 /// WHERE data->'posts' @> jsonb_build_array(jsonb_build_object('id', OLD.pk_post));
 /// ```
 #[pg_extern(immutable, parallel_safe, strict)]
+#[must_use]
 pub fn jsonb_array_delete_where(
     target: JsonB,
     array_path: &str,
@@ -453,6 +454,7 @@ pub fn jsonb_array_insert_where(
 
 /// Find the insertion point to maintain sort order
 #[inline]
+#[must_use]
 pub fn find_insertion_point(
     array: &[Value],
     new_val: Option<&Value>,
@@ -482,6 +484,7 @@ pub fn find_insertion_point(
 
 /// Compare two JSON values for ordering
 #[inline]
+#[must_use]
 pub fn compare_values(a: &Value, b: &Value) -> std::cmp::Ordering {
     use std::cmp::Ordering;
 
@@ -530,7 +533,7 @@ fn find_element_by_match(array: &[Value], match_key: &str, match_value: &Value) 
 }
 
 // Helper function
-fn value_type_name(value: &Value) -> &'static str {
+const fn value_type_name(value: &Value) -> &'static str {
     match value {
         Value::Null => "null",
         Value::Bool(_) => "boolean",

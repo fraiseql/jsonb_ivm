@@ -13,22 +13,22 @@ pub const MAX_JSONB_DEPTH: usize = 1000;
 /// Validate that a JSONB value does not exceed maximum nesting depth
 ///
 /// Recursively traverses the JSONB structure counting nesting levels.
-/// Returns an error if any path exceeds MAX_JSONB_DEPTH levels.
+/// Returns an error if any path exceeds `MAX_JSONB_DEPTH` levels.
 ///
 /// # Arguments
 /// * `val` - The JSONB value to validate
-/// * `max_depth` - Maximum allowed nesting depth (should be MAX_JSONB_DEPTH)
+/// * `max_depth` - Maximum allowed nesting depth (should be `MAX_JSONB_DEPTH`)
 ///
 /// # Returns
 /// * `Ok(())` if depth is within limits
 /// * `Err(String)` with descriptive error message if too deep
+///
+/// # Errors
+/// Returns an error if the JSONB nesting depth exceeds `max_depth` levels.
 pub fn validate_depth(val: &Value, max_depth: usize) -> Result<(), String> {
     fn check_depth(val: &Value, current: usize, max: usize) -> Result<usize, String> {
         if current > max {
-            return Err(format!(
-                "JSONB nesting too deep (max {}, found >{})",
-                max, max
-            ));
+            return Err(format!("JSONB nesting too deep (max {max}, found >{max})"));
         }
         match val {
             Value::Object(map) => {
