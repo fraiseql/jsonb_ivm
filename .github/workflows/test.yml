@@ -325,6 +325,9 @@ jobs:
 
       - name: Configure PostgreSQL
         run: |
+          # Wait a moment for cluster to fully start
+          sleep 2
+
           # Configure trust authentication for local connections (CI only)
           sudo sed -i 's/^local.*all.*postgres.*peer/local all postgres trust/' /etc/postgresql/17/main/pg_hba.conf
           sudo sed -i 's/^host.*all.*all.*127.0.0.1.*scram-sha-256/host all all 127.0.0.1\/32 trust/' /etc/postgresql/17/main/pg_hba.conf
@@ -332,10 +335,24 @@ jobs:
           # Reload PostgreSQL to apply changes
           sudo pg_ctlcluster 17 main reload
 
-          # Wait for PostgreSQL to be ready
-          timeout 30 bash -c 'until pg_isready -h localhost -p 5432 -U postgres -q; do sleep 1; done'
+          # Give reload time to apply
+          sleep 2
 
-          echo "✅ PostgreSQL is ready and accepting connections"
+          # Check if PostgreSQL is ready
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres -q 2>/dev/null; then
+              echo "✅ PostgreSQL is ready and accepting connections"
+              exit 0
+            fi
+            echo "⏳ Waiting for PostgreSQL... ($i/30)"
+            sleep 1
+          done
+
+          # If we get here, PostgreSQL didn't start
+          echo "❌ PostgreSQL failed to start within 30 seconds"
+          sudo pg_lsclusters
+          sudo systemctl status postgresql@17-main || true
+          exit 1
 
       - name: Install cargo-pgrx
         run: cargo install --locked cargo-pgrx --version 0.16.1
