@@ -34,6 +34,10 @@ mod merge;
 pub mod path; // Public for doc tests
 mod search;
 
+// Property-based testing infrastructure (Phase 4)
+#[cfg(test)]
+mod property_tests;
+
 // Re-exports for public API (maintains backward compatibility)
 pub use array_ops::*;
 pub use depth::validate_depth;

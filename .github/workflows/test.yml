@@ -11,16 +11,13 @@ env:
 
 jobs:
   test:
-    name: PostgreSQL ${{ matrix.pg-version }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: PostgreSQL ${{ matrix.pg-version }} (ubuntu-latest)
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
         pg-version: [13, 14, 15, 16, 17, 18]
-        os: [ubuntu-latest]
-        # macOS testing disabled due to pgrx 0.16.1 ARM64 linker issues
-        # Re-enable when upgrading to pgrx 0.17+ with better ARM64 support
 
     steps:
       - name: Checkout code
@@ -240,6 +237,83 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-pg${{ matrix.pg-version }}
-          path: |
-            test_output_*.txt
+          path: test_output_*.txt
           if-no-files-found: ignore
+
+  property-tests:
+    name: Property-Based Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Run property tests
+        run: |
+          ./scripts/run_property_tests.sh 10000
+
+  load-tests:
+    name: Load Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install PostgreSQL 17
+        run: |
+          sudo apt-get install -y wget gnupg
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17 postgresql-server-dev-17
+
+          # Create and start cluster
+          sudo pg_createcluster 17 main --start || true
+          sudo pg_ctlcluster 17 main start || true
+
+      - name: Install cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.16.1
+
+      - name: Initialize pgrx
+        run: cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config
+
+      - name: Build extension
+        run: cargo build --release --locked --no-default-features --features pg17
+
+      - name: Install extension
+        run: cargo pgrx install --pg-config=/usr/lib/postgresql/17/bin/pg_config --release --sudo
+
+      - name: Run load tests
+        run: |
+          ./scripts/run_load_tests.sh
