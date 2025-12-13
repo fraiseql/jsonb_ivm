@@ -73,6 +73,9 @@ pub fn jsonb_array_update_where(
     // Extract match value as serde_json::Value
     let match_val = match_value.0;
 
+    // Security: Validate depth limits to prevent DoS attacks
+    crate::validate_depth(&updates.0, crate::MAX_JSONB_DEPTH).unwrap_or_else(|e| error!("{}", e));
+
     // Validate updates is an object
     let Some(updates_obj) = updates.0.as_object() else {
         error!(

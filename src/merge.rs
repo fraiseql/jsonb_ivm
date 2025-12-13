@@ -45,6 +45,10 @@ pub fn jsonb_merge_shallow(target: Option<JsonB>, source: Option<JsonB>) -> Opti
     let target_value = target.0;
     let source_value = source.0;
 
+    // Security: Validate depth limits to prevent DoS attacks
+    crate::validate_depth(&source_value, crate::MAX_JSONB_DEPTH)
+        .unwrap_or_else(|e| error!("{}", e));
+
     // Validate that both are JSON objects (not arrays or scalars)
     let Some(target_obj) = target_value.as_object() else {
         error!(
@@ -374,6 +378,9 @@ pub fn jsonb_smart_patch_array(
 pub fn jsonb_deep_merge(target: JsonB, source: JsonB) -> JsonB {
     let target_val = target.0;
     let source_val = source.0;
+
+    // Security: Validate depth limits to prevent DoS attacks
+    crate::validate_depth(&source_val, crate::MAX_JSONB_DEPTH).unwrap_or_else(|e| error!("{}", e));
 
     JsonB(deep_merge_recursive(target_val, source_val))
 }
