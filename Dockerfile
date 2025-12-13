@@ -32,8 +32,8 @@ COPY src/ ./src/
 COPY sql/ ./sql/
 COPY jsonb_ivm.control ./
 
-# Build extension - let pgrx find pg_config automatically
-RUN cargo pgrx package
+# Build extension for PostgreSQL 17 with explicit feature flag
+RUN cargo pgrx package --features pg17 --no-default-features
 
 # =============================================================================
 # Stage 2: Production
