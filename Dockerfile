@@ -32,8 +32,10 @@ COPY src/ ./src/
 COPY sql/ ./sql/
 COPY jsonb_ivm.control ./
 
-# Build extension
-RUN cargo pgrx package --pg-config /root/.pgrx/17.2/pgrx-install/bin/pg_config
+# Build extension with better debugging
+RUN set -x && \
+    ls -la /build && \
+    cargo pgrx package --pg-config /root/.pgrx/17.2/pgrx-install/bin/pg_config
 
 # =============================================================================
 # Stage 2: Production
